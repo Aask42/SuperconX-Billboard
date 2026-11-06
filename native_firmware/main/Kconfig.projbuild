@@ -1,0 +1,9 @@
+menu "Supercon Billboard Badge"
+
+config BADGE_EMULATOR
+    bool "Build for QEMU"
+    default n
+    help
+        Disable physical badge I/O and use a small console-backed display path.
+
+endmenu

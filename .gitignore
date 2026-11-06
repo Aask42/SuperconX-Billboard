@@ -1,5 +1,6 @@
 # Build output
 build/
+build-*/
 out/
 *.o
 *.obj
@@ -24,3 +25,30 @@ cmake_install.cmake
 .idea/
 .DS_Store
 Thumbs.db
+
+# Python venv
+.venv/
+__pycache__/
+*.pyc
+
+# PRIVATE — raw flash dumps contain this badge's state; never publish (see BADGE_REPORT.md)
+dump/
+
+# Reference clones kept locally only (each has its own upstream git repo)
+ESP32-DIV/
+esp32-llm/
+native_firmware/third_party/
+
+# Original extracted MicroPython firmware — kept local as the port's source reference.
+# Contains Hackaday/Supercon badge assets (gallery artwork, schedule) that are third-party;
+# not published here pending the maintainer's decision. See TASKS.md / buffer.
+badge_fs/
+badge_fs.orig/
+# Staged LittleFS source (copy of badge_fs assets); same third-party concern.
+native_firmware/vfs_root/
+
+# ESP-IDF
+sdkconfig
+sdkconfig.old
+managed_components/
+dependencies.lock

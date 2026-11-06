@@ -1,0 +1,10 @@
+# Partition layout — mirrors the stock Billboard Badge dump (BADGE_REPORT.md).
+# 8 MB flash. factory app 3 MB, remainder a data partition for the badge's
+# assets (graphics, gallery PNGs, schedule, and later the LLM model/tokenizer).
+# The stock badge formats its data partition as LittleFS; we do the same via the
+# joltwallet/littlefs managed component, mounted by the "storage" label.
+# Name,     Type, SubType, Offset,   Size
+nvs,        data, nvs,     0x9000,   0x6000,
+phy_init,   data, phy,     0xf000,   0x1000,
+factory,    app,  factory, 0x10000,  0x300000,
+storage,    data, spiffs,  0x310000, 0x4F0000,

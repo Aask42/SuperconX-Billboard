@@ -1,0 +1,31 @@
+name: build
+
+# Verifies the native firmware compiles for ESP32-S3 on every push and PR,
+# using the official ESP-IDF v5.4.2 container (matches local ~/esp install).
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  idf-build:
+    runs-on: ubuntu-latest
+    container: espressif/idf:v5.4.2
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: idf.py build (esp32s3)
+        shell: bash
+        run: |
+          . "$IDF_PATH/export.sh"
+          cd native_firmware
+          idf.py set-target esp32s3
+          idf.py build
+
+      - name: Firmware size summary
+        if: always()
+        shell: bash
+        run: |
+          . "$IDF_PATH/export.sh"
+          cd native_firmware
+          idf.py size || true

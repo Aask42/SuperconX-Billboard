@@ -1,0 +1,12 @@
+# Emulator overlay, layered after the project's own sdkconfig.defaults.
+# Only things QEMU cannot do the same way as the badge belong here.
+CONFIG_BADGE_EMULATOR=y
+# QEMU boot-loops on QIO flash.
+CONFIG_ESPTOOLPY_FLASHMODE_QIO=n
+CONFIG_ESPTOOLPY_FLASHMODE_DIO=y
+# QEMU exposes UART0 on -serial; USB-Serial/JTAG is not emulated.
+CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=n
+CONFIG_ESP_CONSOLE_UART_DEFAULT=y
+# QEMU's watchdogs fire spuriously under host load.
+CONFIG_ESP_TASK_WDT_EN=n
+CONFIG_ESP_INT_WDT=n
