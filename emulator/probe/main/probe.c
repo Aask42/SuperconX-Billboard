@@ -62,6 +62,12 @@ static void dump_fb(void)
     printf("\n");
 }
 
+__attribute__((noinline)) static void probe_crash(void)
+{
+    volatile int *bad = (volatile int *)0x4;
+    *bad = 42;
+}
+
 static void handle_line(const char *line)
 {
     if (strncmp(line, "@btn ", 5) == 0) {
@@ -74,6 +80,8 @@ static void handle_line(const char *line)
         render();
     } else if (strcmp(line, "@fb") == 0) {
         dump_fb();
+    } else if (strcmp(line, "@panic") == 0) {
+        probe_crash();  /* exercises backtrace decoding in the dev UI */
     } else {
         printf("ECHO:%s\n", line);
     }

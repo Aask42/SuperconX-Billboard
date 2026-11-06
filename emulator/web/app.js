@@ -160,6 +160,20 @@ if (!('serial' in navigator)) {
   });
 }
 
+let devElfSha = null;
+
+// Panic/backtrace addresses -> function + file:line using the local hardware ELF (like idf.py monitor).
+async function decodeDeviceLine(line) {
+  try {
+    const res = await post('/api/decode', { target: 'hw', text: line, sha: devElfSha });
+    let out = (res.lines || []).map((l) => `    ${l}\n`).join('');
+    if (res.warning) out += `    [decode] ${res.warning}\n`;
+    if (out) appendLog(logs.dev, out);
+  } catch (err) {
+    appendLog(logs.dev, `    [decode] ${err}\n`);
+  }
+}
+
 function onDeviceText(text) {
   devLine += text;
   let out = '';
@@ -175,6 +189,9 @@ function onDeviceText(text) {
       continue;
     }
     out += line + '\n';
+    const sha = line.match(/ELF file SHA256:\s*([0-9a-fA-F]+)/);
+    if (sha) devElfSha = sha[1];
+    if (/Backtrace:|^PC\s*:|Guru Meditation/.test(line)) decodeDeviceLine(line);
     if (/EMU_EPD_REFRESH \d+/.test(line) && $('dev-automirror').checked) deviceSend('@fb\r');
   }
   if (devLine && !'EMU_FB '.startsWith(devLine.slice(0, 7))) { out += devLine; devLine = ''; }

@@ -30,6 +30,9 @@ STATIC = {'/': 'index.html', '/app.js': 'app.js', '/style.css': 'style.css',
           '/vendor/esptool.js': 'vendor/esptool-js/bundle.js'}
 MIME = {'.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.bin': 'application/octet-stream'}
 REFRESH = re.compile(r'EMU_EPD_REFRESH \d+')
+CRASH_LINE = re.compile(r'Backtrace:|^PC\s*:|Guru Meditation')
+CODE_ADDR = re.compile(r'0x(4[0-2][0-9a-fA-F]{6})\b')
+ELF_SHA = re.compile(r'ELF file SHA256:\s*([0-9a-fA-F]+)')
 WATCH_SKIP = {'managed_components', '.git', 'third_party', '__pycache__'}
 WATCH_EXT = {'.c', '.cc', '.cpp', '.h', '.hpp', '.txt', '.csv', '.yml', '.projbuild', '.defaults', '.png', '.bin',
              '.json'}
@@ -76,6 +79,7 @@ class Dev:
         self.gdb_port = 0
         self.line_buf = ''
         self.shown = 0
+        self.emu_elf_sha: str | None = None
         self.snap_lock = threading.Lock()
         self.snap_again = False
         self.frames = 0
@@ -200,6 +204,38 @@ class Dev:
         if self.qemu:
             self.qemu.send(text)
 
+    def elf(self, target: str) -> Path | None:
+        bdir = self.hw_dir() if target == 'hw' else self.emu_dir()
+        try:
+            p = Path(json.loads((bdir / 'project_description.json').read_text())['app_elf'])
+            p = p if p.is_absolute() else bdir / p
+            return p if p.exists() else None
+        except (OSError, KeyError, ValueError):
+            return None
+
+    def decode(self, target: str, text: str, sha: str | None = None) -> dict:
+        """Panic/backtrace line -> 'addr: func at file:line' via addr2line on that target's ELF."""
+        addrs = list(dict.fromkeys('0x' + a for a in CODE_ADDR.findall(text)))
+        if not addrs:
+            return {'lines': []}
+        elf = self.elf(target)
+        if not elf:
+            return {'lines': [], 'warning': f'no {target} ELF built yet; compile it first to decode'}
+        res = {'lines': []}
+        if isinstance(sha, str) and re.fullmatch(r'[0-9a-fA-F]{6,64}', sha):
+            import hashlib
+            built = hashlib.sha256(elf.read_bytes()).hexdigest()
+            if not built.startswith(sha.lower()):
+                res['warning'] = (f'running firmware ELF {sha} != local {target} build {built[:len(sha)]}; '
+                                  'decode may be wrong')
+        try:
+            r = subprocess.run(['xtensa-esp32s3-elf-addr2line', '-pfiaC', '-e', str(elf), *addrs],
+                               capture_output=True, text=True, timeout=20)
+            res['lines'] = [ln for ln in r.stdout.splitlines() if ln.strip()]
+        except (OSError, subprocess.TimeoutExpired) as e:
+            res['warning'] = f'addr2line failed: {e}'
+        return res
+
     def on_serial(self, text: str) -> None:
         """Show serial text as it arrives, but parse complete lines for EMU_FB / EMU_EPD_REFRESH."""
         self.line_buf += text
@@ -212,6 +248,14 @@ class Dev:
                 out.append('[EMU_FB frame]\n')
                 continue
             out.append(line[shown:] + '\n')
+            m = ELF_SHA.search(line)
+            if m:
+                self.emu_elf_sha = m.group(1)
+            if CRASH_LINE.search(line):
+                res = self.decode('emu', line, self.emu_elf_sha)
+                out.extend(f'    {d}\n' for d in res['lines'])
+                if res.get('warning'):
+                    out.append(f'    [decode] {res["warning"]}\n')
             if REFRESH.search(line):
                 threading.Thread(target=self.snapshot, daemon=True).start()
         pending = self.line_buf
@@ -388,6 +432,11 @@ def make_handler(dev: Dev, hub: Hub):
                 dev.emu_send(f'@btn {body["name"]}\r')
             elif u.path == '/api/emu/snapshot':
                 bg(dev.snapshot)
+            elif u.path == '/api/decode':
+                target = body.get('target', 'hw')
+                if target not in ('emu', 'hw'):
+                    return self.send_json({'error': 'target must be emu or hw'}, 400)
+                return self.send_json(dev.decode(target, str(body.get('text', ''))[:4096], body.get('sha')))
             elif u.path == '/api/watch':
                 dev.watching = bool(body.get('on'))
                 dev.set_status(watch=dev.watching)

@@ -106,3 +106,56 @@ def bitmask_to_leds(x: int, r: int = 3, g: int = 3, b: int = 3) -> List[Tuple[in
         v = (x >> (NUM_LEDS - 1 - i)) & 1
         out.append((v * r, v * g, v * b))
     return out
+
+
+# ---- boot flow + config (main.py / json_configs.py) ------------------------
+SPLASH_BELOW_COUNT = 2      # main.py draws the splash while load_counter < 2
+EASTER_EGG_COUNT = 42       # main.py shows the egg image on boot #42
+SPLASH_IMAGE = "supercon-x-splash.png"
+# Stock main.py asked for "never-epd.png" (hyphen) but the file is "never_epd.png"
+# (underscore) -> OSError crash on boot #42. The native rewrite must use this name.
+EGG_IMAGE = "never_epd.png"
+
+
+def next_load_counter(cfg: dict) -> int:
+    """Port of main.py's counter bump: start at 1, otherwise +1."""
+    return cfg["load_counter"] + 1 if "load_counter" in cfg else 1
+
+
+def boot_image_for(counter: int):
+    """Which full-screen image boot draws for a given load_counter, or None."""
+    if counter < SPLASH_BELOW_COUNT:
+        return SPLASH_IMAGE
+    if counter == EASTER_EGG_COUNT:
+        return EGG_IMAGE
+    return None
+
+
+# ---- assets the apps load (badge_fs/data) ----------------------------------
+GALLERY_COUNT = 44          # gallery/001.png .. 044.png
+REQUIRED_GRAPHICS = {
+    "supercon-x-splash.png", "never_epd.png", "hello_i_am_blank.png",
+    "lamarr.png", "hopper.png", "workshops.png",
+    "friday.png", "saturday.png", "sunday.png",
+}
+
+
+def gallery_name(n: int) -> str:
+    """Gallery filenames are zero-padded to 3 digits (001.png .. 044.png)."""
+    if not (1 <= n <= GALLERY_COUNT):
+        raise ValueError(f"gallery index {n} out of 1..{GALLERY_COUNT}")
+    return f"{n:03d}.png"
+
+
+# ---- on-device LLM (llama2.c / tinystories) --------------------------------
+LLM_VOCAB_SIZE = 512        # stories260K + tok512 -> vocab 512 (model & tokenizer must agree)
+
+
+def read_llama2_config(path: Path) -> dict:
+    """Parse a llama2.c checkpoint header: 7 little-endian int32
+    (dim, hidden_dim, n_layers, n_heads, n_kv_heads, vocab_size, seq_len)."""
+    import struct
+    with open(path, "rb") as fh:
+        dim, hidden, layers, heads, kv, vocab, seq = struct.unpack("<7i", fh.read(28))
+    return dict(dim=dim, hidden_dim=hidden, n_layers=layers, n_heads=heads,
+                n_kv_heads=kv, vocab_size=vocab, seq_len=seq)
