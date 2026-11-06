@@ -1,0 +1,26 @@
+# Build output
+build/
+out/
+*.o
+*.obj
+*.a
+*.so
+*.dylib
+*.dll
+*.elf
+*.bin
+*.hex
+*.uf2
+*.map
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+
+# PlatformIO (if used)
+.pio/
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
