@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Supercon Badge Dev</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<header>
+  <h1>Supercon Badge Dev</h1>
+  <span id="project" class="muted"></span>
+  <span class="pill" id="pill-build">build: idle</span>
+  <span class="pill" id="pill-emu">emulator: stopped</span>
+  <span class="pill" id="pill-dev">device: not connected</span>
+  <span class="pill" id="pill-server">server: connecting</span>
+</header>
+
+<main>
+  <section class="screen-col">
+    <div class="tabs" data-group="screen">
+      <button class="tab active" data-tab="screen-emu">Emulator screen</button>
+      <button class="tab" data-tab="screen-dev">Device screen</button>
+    </div>
+    <div class="screen-wrap tabpane active" id="screen-emu">
+      <canvas id="canvas-emu" width="960" height="672" tabindex="0" title="Focus, then ←/→ = Menu −/+, A/B keys"></canvas>
+      <div class="screen-meta" id="meta-emu">no frame yet</div>
+    </div>
+    <div class="screen-wrap tabpane" id="screen-dev">
+      <canvas id="canvas-dev" width="960" height="672"></canvas>
+      <div class="screen-meta" id="meta-dev">no frame yet: connect the device, then "Mirror screen" (needs the firmware's @fb command)</div>
+    </div>
+    <div class="buttons">
+      <span class="muted">Badge buttons →</span>
+      <span id="btn-target" class="muted">emulator</span>
+      <button data-btn="menu_minus">Menu −</button>
+      <button data-btn="menu_plus">Menu +</button>
+      <button data-btn="a">A</button>
+      <button data-btn="b">B</button>
+    </div>
+  </section>
+
+  <section class="side">
+    <div class="card">
+      <h2>Emulator (QEMU)</h2>
+      <div class="row">
+        <button id="emu-build" class="primary">Build &amp; run</button>
+        <button id="emu-start">Restart</button>
+        <button id="emu-stop">Stop</button>
+        <button id="emu-snap">Snapshot</button>
+      </div>
+      <label class="toggle"><input type="checkbox" id="watch"> Live reload: rebuild + reboot on save</label>
+    </div>
+
+    <div class="card">
+      <h2>Device (Web Serial)</h2>
+      <p class="muted" id="webserial-note"></p>
+      <div class="row">
+        <button id="dev-connect" class="primary">Connect</button>
+        <button id="dev-disconnect">Disconnect</button>
+        <button id="dev-reset">Reset</button>
+        <button id="dev-mirror">Mirror screen</button>
+      </div>
+      <label class="toggle"><input type="checkbox" id="dev-automirror"> Auto-mirror on each EMU_EPD_REFRESH</label>
+      <hr>
+      <div class="row">
+        <button id="hw-build">Compile for badge</button>
+        <button id="hw-flash">Flash</button>
+        <button id="hw-buildflash" class="danger">Compile &amp; flash</button>
+      </div>
+      <label class="toggle"><input type="checkbox" id="hw-fs"> Include filesystem image (assets, ~5 MB, slow)</label>
+      <label class="toggle"><input type="checkbox" id="hw-autopush"> Also compile &amp; flash device on save (needs Live reload)</label>
+      <progress id="flash-progress" max="100" value="0" hidden></progress>
+      <div class="muted" id="flash-status"></div>
+    </div>
+  </section>
+
+  <section class="logs">
+    <div class="tabs" data-group="log">
+      <button class="tab active" data-tab="log-build">Build</button>
+      <button class="tab" data-tab="log-emu">Emulator serial</button>
+      <button class="tab" data-tab="log-dev">Device serial</button>
+      <button id="log-clear" class="right">Clear</button>
+    </div>
+    <pre class="tabpane active log" id="log-build"></pre>
+    <div class="tabpane" id="log-emu">
+      <pre class="log" id="log-emu-pre"></pre>
+      <form class="term" data-target="emu"><input placeholder="send to emulator UART (Enter)" autocomplete="off"></form>
+    </div>
+    <div class="tabpane" id="log-dev">
+      <pre class="log" id="log-dev-pre"></pre>
+      <form class="term" data-target="dev"><input placeholder="send to device serial (Enter)" autocomplete="off"></form>
+    </div>
+  </section>
+</main>
+
+<dialog id="flash-confirm">
+  <form method="dialog">
+    <h3>Flash the badge?</h3>
+    <p>This overwrites the badge's stock MicroPython firmware with the native build.
+      Make sure you have the flash backup (<code>dump/</code>) before the first flash.</p>
+    <ul id="flash-files"></ul>
+    <label><input type="checkbox" id="flash-noask"> Don't ask again this session</label>
+    <menu><button value="cancel">Cancel</button> <button value="ok" class="danger">Flash</button></menu>
+  </form>
+</dialog>
+
+<script type="module" src="/app.js"></script>
+</body>
+</html>

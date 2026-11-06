@@ -1,0 +1,54 @@
+# Draft emulator CI job (T54). Claude owns .github/: copy this into .github/workflows/ when ready.
+# Builds native_firmware with the emulator overlay and runs the QEMU boot smoke scenario.
+name: emulator
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  qemu-smoke:
+    runs-on: ubuntu-latest
+    container: espressif/idf:v5.4.2
+    env:
+      QEMU_TAG: esp-develop-9.2.2-20260417
+      QEMU_VER: esp_develop_9.2.2_20260417
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Espressif QEMU 9.2.2 (8 MB octal PSRAM) and littlefs-python
+        shell: bash
+        run: |
+          apt-get update -qq && apt-get install -y -qq libsdl2-2.0-0 libslirp0 libpixman-1-0 >/dev/null
+          mkdir -p /opt/qemu && cd /opt/qemu
+          curl -sL "https://github.com/espressif/qemu/releases/download/${QEMU_TAG}/qemu-xtensa-softmmu-${QEMU_VER}-x86_64-linux-gnu.tar.xz" | tar xJ
+          . "$IDF_PATH/export.sh"
+          python -m pip install -q littlefs-python
+          echo "EMU_QEMU=/opt/qemu/qemu/bin/qemu-system-xtensa" >> "$GITHUB_ENV"
+
+      - name: Build (emulator overlay)
+        shell: bash
+        run: |
+          . "$IDF_PATH/export.sh"
+          python emulator/emu.py build
+
+      - name: Harness self-test
+        shell: bash
+        run: |
+          . "$IDF_PATH/export.sh"
+          python emulator/emu.py build --project emulator/probe
+          python emulator/emu.py test emulator/scenarios/probe_selftest.scn --project emulator/probe --fs emulator/probe/fs --quiet
+
+      - name: Boot smoke
+        shell: bash
+        run: |
+          . "$IDF_PATH/export.sh"
+          python emulator/emu.py test emulator/scenarios/boot_smoke.scn --quiet
+
+      - name: Upload serial logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qemu-logs
+          path: emulator/out/**/*.log

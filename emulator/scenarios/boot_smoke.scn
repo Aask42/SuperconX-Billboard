@@ -1,0 +1,8 @@
+# Boot smoke for native_firmware: app starts, /data mounts, no panic or reboot.
+# Run: python emu.py test scenarios/boot_smoke.scn
+expect 30 octal_psram: density
+expect 30 main_task: Calling app_main\(\)
+sleep 5
+reject Guru Meditation
+reject abort\(\) was called
+reject E \(\d+\) (main|badge|epd|littlefs|esp_littlefs)

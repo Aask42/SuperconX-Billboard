@@ -1,0 +1,5 @@
+# Test tooling for the SuperconX Billboard firmware.
+# esptool / pyserial / littlefs-python come from the project .venv already.
+behave>=1.2.6
+pytest>=8.0
+littlefs-python>=0.19

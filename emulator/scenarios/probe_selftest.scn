@@ -1,0 +1,17 @@
+# Harness self-test against emulator/probe: PSRAM, LittleFS image, UART input, emulator contract.
+# Run: python emu.py test scenarios/probe_selftest.scn --project probe --fs probe/fs
+expect 30 psram free=[1-9]\d+
+expect 10 PLANES_READY
+reject PLANES_FAIL
+expect 10 FS:emulator littlefs ok
+expect 10 EMU_EPD_REFRESH 1
+send hello badge
+expect 5 ECHO:hello badge
+button menu_plus
+expect 5 EMU_EPD_REFRESH 2
+button b
+expect 5 EMU_EPD_REFRESH 3
+send @fb
+expect 10 EMU_FB 960 672 raw [A-Za-z0-9+/=]{200000,}
+fbdump ../out/probe/selftest.png
+reject Guru Meditation

@@ -14,6 +14,7 @@ Builds go to emulator/out/<project-name>/ so the hardware build/ dir is never to
 from __future__ import annotations
 
 import argparse
+import codecs
 import csv
 import os
 import re
@@ -33,9 +34,10 @@ REPO = HERE.parent
 DEFAULT_PROJECT = REPO / 'native_firmware'
 OVERLAY = HERE / 'sdkconfig.emulator'
 FLASH_SIZE = '8MB'
-PSRAM = '8M'
+PSRAM = '8M'  # badge: 8 MB octal (needs Espressif QEMU >= 9.2.2)
 EPD_W, EPD_H = 960, 672
 PLANE_BYTES = EPD_W // 8 * EPD_H
+BUTTONS = ('menu_minus', 'menu_plus', 'a', 'b')
 
 
 def die(msg: str) -> None:
@@ -55,13 +57,21 @@ def build_dir(project: Path) -> Path:
 
 
 def qemu_bin() -> str:
-    q = shutil.which('qemu-system-xtensa')
-    if q:
-        return q
+    """$EMU_QEMU, else the newest Espressif QEMU under ~/.espressif, else PATH."""
+    if os.environ.get('EMU_QEMU'):
+        return os.environ['EMU_QEMU']
     found = sorted(Path.home().glob('.espressif/tools/qemu-xtensa/*/qemu/bin/qemu-system-xtensa'))
-    if not found:
-        die('qemu-system-xtensa not found; run `python $IDF_PATH/tools/idf_tools.py install qemu-xtensa`')
-    return str(found[-1])
+    if found:
+        return str(found[-1])
+    q = shutil.which('qemu-system-xtensa')
+    if not q:
+        die('qemu-system-xtensa not found; see emulator/README.md')
+    return q
+
+
+def efuse_device(qemu: str) -> str:
+    # Older builds only had the C3 efuse model wired to the S3 machine (QEMU-201).
+    return 'nvram.esp32s3.efuse' if b'nvram.esp32s3.efuse' in Path(qemu).read_bytes() else 'nvram.esp32c3.efuse'
 
 
 def gdb_bin() -> str:
@@ -166,7 +176,12 @@ def cmd_image(args) -> Path:
     fs_dir = Path(args.fs).resolve() if args.fs else None
     if fs_dir is None and (project / 'vfs_root' / 'data').is_dir():
         fs_dir = project / 'vfs_root' / 'data'
-    if fs_dir and not args.no_fs:
+    if not args.no_fs:
+        if fs_dir is None:
+            empty = bdir / 'emu_fs_empty'
+            empty.mkdir(exist_ok=True)
+            fs_dir = empty
+            print('emu: no vfs_root/data in project; packing an empty LittleFS (use --fs DIR for assets)')
         part = next((p for p in partitions(project, bdir) if p['name'] == args.fs_partition), None)
         if part is None:
             die(f'no partition named {args.fs_partition!r} in partitions.csv')
@@ -187,11 +202,12 @@ def cmd_image(args) -> Path:
 # ---------------------------------------------------------------- qemu
 
 def qemu_args(bdir: Path, serial: str, gdb_port: int | None = None) -> list[str]:
-    args = [qemu_bin(), '-M', 'esp32s3', '-m', PSRAM,
+    q = qemu_bin()
+    args = [q, '-M', 'esp32s3', '-m', PSRAM,
+            '-global', 'driver=ssi_psram,property=is_octal,value=true',
             '-drive', f'file={bdir / "emu_flash.bin"},if=mtd,format=raw',
             '-drive', f'file={bdir / "emu_efuse.bin"},if=none,format=raw,id=efuse',
-            '-global', 'driver=nvram.esp32c3.efuse,property=drive,value=efuse',
-            '-global', 'driver=timer.esp32s3.timg,property=wdt_disable,value=true',
+            '-global', f'driver={efuse_device(q)},property=drive,value=efuse',
             '-nic', 'none', '-display', 'none', '-serial', serial]
     if serial != 'mon:stdio':
         args += ['-monitor', 'none']
@@ -203,7 +219,8 @@ def qemu_args(bdir: Path, serial: str, gdb_port: int | None = None) -> list[str]
 class Qemu:
     """QEMU with UART0 on a pipe; output is accumulated for expect()."""
 
-    def __init__(self, bdir: Path, gdb_port: int | None = None, echo: bool = True, log: Path | None = None):
+    def __init__(self, bdir: Path, gdb_port: int | None = None, echo: bool = True, log: Path | None = None,
+                 on_output=None, keep: bool = True):
         self.proc = subprocess.Popen(qemu_args(bdir, 'stdio', gdb_port), stdin=subprocess.PIPE,
                                      stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         self.buf = ''
@@ -211,17 +228,24 @@ class Qemu:
         self.lock = threading.Lock()
         self.echo = echo
         self.log = open(log, 'w') if log else None
+        self.max_boots = 1
+        self.on_output = on_output
+        self.keep = keep
         threading.Thread(target=self._pump, daemon=True).start()
 
     def _pump(self) -> None:
         assert self.proc.stdout
+        decoder = codecs.getincrementaldecoder('utf-8')('replace')
         while True:
             chunk = self.proc.stdout.read1(4096)
             if not chunk:
                 return
-            text = chunk.decode('utf-8', 'replace')
-            with self.lock:
-                self.buf += text
+            text = decoder.decode(chunk)
+            if self.keep:
+                with self.lock:
+                    self.buf += text
+            if self.on_output:
+                self.on_output(text)
             if self.echo:
                 sys.stdout.write(text)
                 sys.stdout.flush()
@@ -238,6 +262,10 @@ class Qemu:
                 if m:
                     self.pos = m.end()
                     return m
+                boots = self.buf.count('ESP-ROM:')
+            if boots > self.max_boots:
+                raise AssertionError(f'firmware rebooted ({boots} boots) while waiting for /{pattern}/; '
+                                     'see serial log for the panic')
             if self.proc.poll() is not None:
                 raise AssertionError(f'QEMU exited ({self.proc.returncode}) while waiting for /{pattern}/')
             time.sleep(0.05)
@@ -331,7 +359,9 @@ SCENARIO_HELP = """Scenario file: one step per line, '#' comments.
   reject <regex>                 fail if regex appears anywhere in output so far
   send <text>                    send text + '\\r' to UART0 (use \\n, \\t escapes)
   sendraw <text>                 send text without a trailing CR
+  button <menu_minus|menu_plus|a|b>   press a badge button (sends '@btn <name>' per the emulator contract)
   sleep <seconds>
+  boots <n>                      allow up to n boot banners (default 1; extra reboots fail the test)
   fbdump <out.png> [black_expr red_expr]   dump e-paper planes via gdb (paths relative to scenario)
 """
 
@@ -362,6 +392,12 @@ def cmd_test(args) -> None:
             elif op in ('send', 'sendraw'):
                 text = rest.encode().decode('unicode_escape')
                 q.send(text + ('\r' if op == 'send' else ''))
+            elif op == 'button':
+                if rest not in BUTTONS:
+                    raise AssertionError(f'unknown button {rest!r}; expected one of {BUTTONS}')
+                q.send(f'@btn {rest}\r')
+            elif op == 'boots':
+                q.max_boots = int(rest)
             elif op == 'sleep':
                 time.sleep(float(rest))
             elif op == 'fbdump':
@@ -409,10 +445,10 @@ def main() -> None:
     def common(p):
         p.add_argument('--project', default=str(DEFAULT_PROJECT), help='ESP-IDF project dir')
         p.add_argument('--fs', help='directory to pack as LittleFS (default: <project>/vfs_root/data if present)')
-        p.add_argument('--no-fs', action='store_true', help='do not write a LittleFS image')
+        p.add_argument('--no-fs', action='store_true', help='leave the storage partition blank (erased flash)')
         p.add_argument('--fs-partition', default='storage', help='partition name for the LittleFS image')
-        p.add_argument('--black', default="'epd.c'::s_black", help='gdb expression for the black plane pointer')
-        p.add_argument('--red', default="'epd.c'::s_red", help='gdb expression for the red plane pointer')
+        p.add_argument('--black', default='badge_emu_fb_black', help='gdb expression for the black plane pointer')
+        p.add_argument('--red', default='badge_emu_fb_red', help='gdb expression for the red plane pointer')
         p.add_argument('--quiet', action='store_true', help='do not echo serial output')
         return p
 

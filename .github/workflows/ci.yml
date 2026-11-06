@@ -29,3 +29,17 @@ jobs:
           . "$IDF_PATH/export.sh"
           cd native_firmware
           idf.py size || true
+
+  unit-tests:
+    # Fast host tests — no QEMU, no hardware. Validate the data/algorithm
+    # contracts and the emulator harness helpers.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install test deps
+        run: python -m pip install -r tests/requirements.txt
+      - name: pytest
+        run: python -m pytest tests/unit

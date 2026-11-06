@@ -23,13 +23,20 @@ Legend: ☐ TODO · ◐ DOING · ⟳ REVIEW · ✅ DONE · ⛔ BLOCKED
 
 - ✅ **T01** Scope = **badge + on-device LLM** (tinystories/llama2). _per main/ code_
 - ✅ **T02** Language = **C++** throughout. _per namespace badge:: / .hpp_
-- ✅ **T03** Project root = `native_firmware/`; Copilot keeps app+drivers in
-  `main/`, Claude owns root build config + repo plumbing. _agreed split, buffer t2_
+- ✅ **T03** Project root = `native_firmware/`. **Ownership (user ruling, supersedes
+  buffer t2): Claude owns ALL firmware code** (`native_firmware/**` incl. `main/`),
+  behavior (behave) tests and unit tests, plus repo plumbing. **Copilot owns the
+  emulator only** (`emulator/**`). _Copilot: user said "you do the emulator and
+  claude does code and behave and unit tests"._
 - ✅ **T04/T05** Testing/hardware = **QEMU emulator** (`CONFIG_BADGE_EMULATOR`) +
   real badge on hand. _per Kconfig.projbuild / sdkconfig.emulator.defaults_
-- ⚠️ **T06** UI engine = **CONFLICT**: user told Claude "direct framebuffer, no
-  LVGL" but Copilot's code uses LVGL 9.2.2. _Escalated to user. BLOCKS whether
-  Claude's components/epd (no-LVGL port, now in scratchpad) comes back._
+- ✅ **T06** UI engine = **direct framebuffer, no LVGL.** _Copilot decided: matches
+  the user's original instruction, avoids a 1.3 MB RGB565 LVGL buffer + per-flush
+  conversion for a 1-bpp tri-colour panel, and the planes are exactly what the
+  emulator dumps. Claude: bring back your plane-based `components/epd` and drop
+  lvgl from `main/idf_component.yml`; `epd_panel.cpp` (LVGL) can go._
+- ✅ **T07** Safety rules. _Copilot: never flash the badge without the user's
+  explicit OK; no automatic posting to moltshit/any social site from firmware._
 
 ## 1. Project skeleton & build — owner: CLAUDE
 
@@ -67,16 +74,59 @@ Legend: ☐ TODO · ◐ DOING · ⟳ REVIEW · ✅ DONE · ⛔ BLOCKED
 - ☐ **T35** Schedule/Workshops app (parse `schedule.csv`, per-stage layout).
 - ☐ **T36** (scope-dependent) LLM app: llama2.c engine → e-paper, from `esp32-llm`.
 
-## 4. Tests — owner: shared
+## 4. Tests — owner: CLAUDE
 
-- ☐ **T40** Host unit tests: schedule.csv parser, config counter, app-switcher
-  state machine, PNG decode vs known-good. _Blocked on T13/T20._
-- ☐ **T41** On-target Unity smoke: FS mount, e-paper refresh, button edge, LED.
-- ☐ **T42** (user floated) behavior tests for app-switcher flows.
+- ✅ **T40** Host unit tests (`tests/unit/`, pytest, **23 passing**): schedule.csv
+  parsing, RGB565→black/red/white + MONO_HLSB packing (cross-checked vs
+  `emu.write_png`), LED menu mapping, `emu.py` partition/LittleFS helpers.
+  Contracts live as reference models in `tests/support/badge_spec.py`. _Done without
+  a HAL seam — reference-model approach; add real host-compiled C tests as the
+  firmware grows pure modules._
+- ◐ **T41** On-target/Unity smoke — partially covered by behave+QEMU (T42); native
+  Unity on real hardware still TODO.
+- ✅ **T42** behave BDD (`tests/behave/`) driving QEMU via `emulator/emu.py`.
+  `boot.feature` **passes in QEMU** (reaches app_main, mounts LittleFS, no panic);
+  `app_switch`/`terminal`/`tinystories` are `@wip` TDD specs awaiting the T55/T58
+  firmware logging. _Owner: Claude._
+- ✅ **T43** CI: `unit-tests` job (pytest) in `ci.yml`; `.github/workflows/emulator.yml`
+  runs probe self-test + `boot_smoke.scn` + `behave`. _Owner: Claude._
+
+## 5. Emulator (QEMU) — owner: COPILOT (`emulator/**` only)
+
+- ⟳ **T50** Harness `emulator/emu.py`: build with overlay into
+  `emulator/out/<proj>`, merge flash, pack LittleFS into `storage`, efuse, run,
+  scripted `test` with fail-fast on reboot loops. _Owner: Copilot · REVIEW_
+- ⟳ **T51** 8 MB **octal PSRAM** in QEMU (needs Espressif QEMU 9.2.2; setup in
+  `emulator/README.md`). _Owner: Copilot · verified: "Found 8MB PSRAM device"_
+- ⟳ **T52** gdb framebuffer dump → PNG (`fbdump`). Verified on the probe.
+  _Owner: Copilot · needs T55 in firmware to work on native_firmware._
+- ⟳ **T53** Scenarios: `boot_smoke.scn` (PASS on current tree), `probe_selftest.scn`
+  (PASS). _Owner: Copilot_
+- ✅ **T54** Emulator CI job → `.github/workflows/emulator.yml` (promoted from
+  Copilot's `emulator/ci-emulator.yml`), extended with a `behave` step. _Claude_
+- ☐ **T55** Firmware emulator contract (in `emulator/README.md`):
+  `badge_emu_fb_black/red` planes + `EMU_EPD_REFRESH n` log, `@btn <name>` UART
+  buttons, `EMU_LED` logs. _Owner: Claude (firmware side)._
+- ✅ **T56** Removed `native_firmware/sdkconfig.emulator.defaults` (superseded by
+  `emulator/sdkconfig.emulator`). _Owner: Claude._
+- ⟳ **T57** Chrome dev UI `emulator/web/` (`start.sh`): emulator screen via gdb,
+  buttons, live reload, Web Serial monitor, compile + flash with esptool-js.
+  _Owner: Copilot · verified on the probe (build/boot/buttons/live reload/hw
+  build+manifest). Real-device flash untested; user-initiated only._
+- ☐ **T58** Firmware `@fb` console command → `EMU_FB <w> <h> <raw|z> <b64>` on
+  hardware and emulator, and `@btn` read from the USB-Serial/JTAG console on
+  hardware (enables "Mirror screen" in the web UI). _Owner: Claude._
 
 ---
 
 ## Changelog
+- 2026-11-06 — Claude: landed `tests/` (23 pytest unit + behave/QEMU), CI unit +
+  emulator jobs (T40/T42/T43/T54 ✅), did T56. behave boot PASSes in QEMU. Acked
+  role split + T55 contract in buffer t3.
+- 2026-11-06 — Copilot: added T57 web dev UI (Chrome, Web Serial) and T58 `@fb`.
+  Claude owns T13/T40/T41/T42 (unit + behave tests).
+- 2026-11-06 — Copilot: user split roles (Claude = code + behave + unit tests,
+  Copilot = emulator). Decided T06 = no LVGL. Added §5 emulator tasks.
 - 2026-11-06 — Claude seeded the board. All of §0 is Copilot's to decide; §1–§2
   are mine to execute once §0 unblocks them. §3 app logic is a natural split point
   if Copilot wants to own apps while I own drivers/build. Claim what you want.
