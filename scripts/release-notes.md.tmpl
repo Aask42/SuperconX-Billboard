@@ -1,0 +1,78 @@
+# SuperconX Billboard — firmware {{VERSION}}
+
+Native ESP32-S3 firmware for the Supercon 10 "Billboard Badge", built with
+ESP-IDF v5.4.2. This version string is embedded in the firmware (`PROJECT_VER`)
+so the badge and the web flasher both report `{{VERSION}}`.
+
+## ⚠️ This is an APP-ONLY release
+
+These artifacts contain the **bootloader + partition table + factory app only**.
+They do **not** include the LittleFS `storage` image (gallery artwork, schedule,
+and the TinyStories model/tokenizer). Those are third-party assets that are not
+yet cleared for redistribution, so the `storage` partition (`0x310000`) ships
+empty. The firmware boots and mounts an empty `/data`; asset-backed apps will be
+blank until a future full-image release.
+
+## Flashing (user-initiated)
+
+Nothing here flashes your badge automatically — every path below is something
+**you** choose to run. The badge is fully open (no secure boot / flash
+encryption), so you can always go back.
+
+**Easiest — ESP Web Tools:** host `manifest.json` next to the other assets and
+open it with an ESP Web Tools install button, or any installer that accepts a
+manifest URL. It writes the three component parts to an ESP32-S3.
+
+**One-shot full image (esptool):**
+
+```
+esptool.py --chip esp32s3 write_flash 0x0 superconx-billboard-{{VERSION}}-merged.bin
+```
+
+**Manual component flash (esptool):**
+
+```
+esptool.py --chip esp32s3 write_flash \
+  0x0      bootloader.bin \
+  0x8000   partition-table.bin \
+  0x10000  superconx-billboard-{{VERSION}}-factory.bin
+```
+
+Verify downloads against `SHA256SUMS`:
+
+```
+sha256sum -c SHA256SUMS
+```
+
+## Restoring the stock badge
+
+This firmware replaces the stock LVGL-MicroPython "Billboard Badge" image. To go
+back, reflash your own full dump as described in
+[BADGE_REPORT.md](BADGE_REPORT.md) ("Restore to stock"):
+
+```
+esptool.py --port /dev/tty.usbmodemXXXX write_flash 0 dump/badge_full_8MB.bin
+```
+
+(The stock dump is personal to your badge and is not distributed here.)
+
+## How these artifacts were validated in CI
+
+- `esptool image_info` parses the merged image and the factory app.
+- The factory app's embedded version equals `{{VERSION}}`.
+- `manifest.json` parses, and every referenced part exists at an offset that
+  matches `native_firmware/partitions.csv` (factory `@0x10000`).
+- A QEMU 9.2.2 boot smoke (Espressif QEMU, via `emulator/emu.py`) boots the same
+  tagged source and confirms it reaches `app_main()` and mounts `/data` with no
+  panic or reboot.
+
+## Assets
+
+| File | Purpose |
+|---|---|
+| `superconx-billboard-{{VERSION}}-merged.bin` | Full image, flash at `0x0` (app-only) |
+| `bootloader.bin` | Component part `@0x0` |
+| `partition-table.bin` | Component part `@0x8000` |
+| `superconx-billboard-{{VERSION}}-factory.bin` | Factory app `@0x10000` |
+| `manifest.json` | ESP Web Tools manifest |
+| `SHA256SUMS` | SHA-256 of every asset above |
