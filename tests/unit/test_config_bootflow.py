@@ -17,6 +17,13 @@ from support.badge_spec import (
 REPO = Path(__file__).resolve().parents[2]
 DATA = REPO / "native_firmware" / "vfs_root" / "data"
 
+# Same payload rule as test_assets.py: the staged payload is gitignored,
+# so tests that read it SKIP on a clean clone, never fail.
+requires_data = pytest.mark.skipif(
+    not DATA.is_dir(),
+    reason="native_firmware/vfs_root/data not staged (gitignored payload)",
+)
+
 
 def test_load_counter_starts_at_one_when_absent():
     assert next_load_counter({}) == 1
@@ -26,6 +33,7 @@ def test_load_counter_increments():
     assert next_load_counter({"load_counter": 3}) == 4
 
 
+@requires_data
 def test_panel_config_is_valid_json_with_counter():
     cfg = json.loads((DATA / "panel_config.json").read_text())
     assert isinstance(cfg.get("load_counter"), int)
@@ -43,6 +51,7 @@ def test_easter_egg_boot_number():
     assert boot_image_for(EASTER_EGG_COUNT - 1) is None
 
 
+@requires_data
 def test_egg_image_filename_exists_regression():
     """The egg must point at a file that actually exists (the stock bug did not)."""
     assert (DATA / "graphics" / EGG_IMAGE).exists(), \
