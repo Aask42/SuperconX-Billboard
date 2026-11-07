@@ -52,3 +52,6 @@ sdkconfig
 sdkconfig.old
 managed_components/
 dependencies.lock
+
+# Claude Code local state / agent worktrees
+.claude/
