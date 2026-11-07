@@ -8,7 +8,11 @@ Feature: Nametag app
     Given the badge firmware has booted
     When I type "@app nametag" on the serial console
     When I type "@name CLAUDE" on the serial console
-    Then I should see "nametag rendered" within 10 seconds
+    # Assert in stream order: the name is set, THEN the (re-)render completes, so
+    # the plane dump below reflects the CLAUDE render, not the default boot name.
+    Then I should see "nametag set" within 10 seconds
+    And "nametag rendered" appears within 10 seconds
+    # Refresh poll gates the plane reads: both renders are done before we dump.
     And at least 2 e-paper refreshes have occurred
     And the panel has black ink in rows 230 to 294
     And the panel has red ink in rows 420 to 452
