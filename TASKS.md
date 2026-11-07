@@ -196,3 +196,8 @@ Legend: ☐ TODO · ◐ DOING · ⟳ REVIEW · ✅ DONE · ⛔ BLOCKED
   assertion order corrected for nametag/gallery (stream-ordered; gallery verifies
   image selection). #13 release-artifact contract tests landed (6 tests). 255 unit
   tests pass. Trunk at f1a5277 (dev == feat/esp-idf-scaffold).
+- 2026-11-07 — Claude: **issue #3 boot flow wired** (commit c1a25ec). app_main
+  bumps a persistent NVS load counter each boot; renders splash (early boots) /
+  easter egg (#42) via a shared render_png_file() helper; `@boot <n>` test hook.
+  boot_flow.feature (3 scenarios, stream-ordered) passes in QEMU; boot+preflight
+  unchanged. Pure rules already covered by test_config_bootflow. Trunk at c1a25ec.
