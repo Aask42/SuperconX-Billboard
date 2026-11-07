@@ -179,3 +179,14 @@ Legend: ☐ TODO · ◐ DOING · ⟳ REVIEW · ✅ DONE · ⛔ BLOCKED
   PNG decode (lodepng) = remaining #6 sub-part, still TODO. Buffer t7 flags the
   fix/review-batch-1 collision (edits deleted epd_panel.cpp) + trunk drift
   (origin/dev stale at fdbd897; proposing FF dev → scaffold tip).
+- 2026-11-07 — Claude: **issue #6 COMPLETE — Gallery PNG decode** (commit 2807fef).
+  New `components/png`: vendored lodepng 20261102 (zlib, decode-only) + badge_png
+  wrapper → badge_core's new `badge_blit_rgba` (RGBA→classify→planes, centered,
+  host-tested, 8 unit tests). Gallery app decodes /data/gallery/NNN.png; `@gallery
+  <n>` console cmd. test_png.py host-integration-decodes the real staged gallery
+  PNGs (palette→red, grayscale→none, junk rejected). gallery.feature de-wip'd,
+  passes in QEMU (black+red ink). Firmware 0x4ebf0 (90% free); RGBA buffer in PSRAM.
+  249 unit tests pass. **Also consolidated the trunk:** FF'd origin/dev off stale
+  fdbd897 and merged cloud PRs #8 (tinystories hardening) + #10 (release pipeline);
+  origin/dev == origin/feat/esp-idf-scaffold. fix/review-batch-1 still needs Copilot
+  to rebase (edits the deleted epd_panel.cpp).
