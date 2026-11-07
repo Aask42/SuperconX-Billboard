@@ -27,6 +27,8 @@ def test_load_counter_increments():
 
 
 def test_panel_config_is_valid_json_with_counter():
+    if not (DATA / "panel_config.json").exists():
+        pytest.skip("vfs_root/data not staged (gitignored; present only locally)")
     cfg = json.loads((DATA / "panel_config.json").read_text())
     assert isinstance(cfg.get("load_counter"), int)
 
@@ -45,6 +47,8 @@ def test_easter_egg_boot_number():
 
 def test_egg_image_filename_exists_regression():
     """The egg must point at a file that actually exists (the stock bug did not)."""
+    if not (DATA / "graphics").is_dir():
+        pytest.skip("vfs_root/data/graphics not staged (gitignored; present only locally)")
     assert (DATA / "graphics" / EGG_IMAGE).exists(), \
         f"{EGG_IMAGE} missing — would reproduce the stock never-epd.png crash"
     # And the buggy stock name must NOT be what we rely on.
