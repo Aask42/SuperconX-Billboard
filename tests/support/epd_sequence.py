@@ -72,4 +72,8 @@ def build_reference(half: int = 40320):
     cmd(BOTH, 0x09, (0x7F,)); cmd(BOTH, 0x05, (0x7D,)); cmd(BOTH, 0x09, (0x00,))
     delay(200); busy()
     ops.append(("dc", 0)); ops.append(("cs", 1, 0)); ops.append(("rst", 0)); ops.append(("cs", 1, 1))
+    # CS2 parked high explicitly (stock leaves it high after the last command;
+    # the driver now asserts it rather than relying on the cmd() HAL). PWR_EN is
+    # deliberately left powered — stock does not gate the panel rail on shutdown.
+    ops.append(("cs", 2, 1))
     return ops

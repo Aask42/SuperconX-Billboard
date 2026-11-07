@@ -157,6 +157,14 @@ static void dcdc_soft_shutdown(void)
     g_hal->cs(1, 0);
     g_hal->rst(0);
     g_hal->cs(1, 1);
+    /* Park CS2 high explicitly. Stock leaves CS2 high after its final command
+     * write (epd.py _send_index_data deselects both), so this matches the known
+     * sequence — but asserting it here means the parked state no longer depends
+     * on the cmd() HAL's internal CS handling. PWR_EN is intentionally NOT gated:
+     * stock keeps the panel rail powered through shutdown; cutting it is a
+     * hardware-bring-up decision, not stock behaviour, so it stays out of the
+     * golden-pinned sequence. */
+    g_hal->cs(2, 1);
 }
 
 void epd_seq_refresh(const uint8_t *bl, const uint8_t *rl,

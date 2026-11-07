@@ -102,10 +102,13 @@ def test_dcdc_ramp_values_present_in_order(captured):
 
 def test_shutdown_leaves_documented_pin_states(captured):
     # Tail of the stream is the shutdown pin choreography.
-    tail = [o for o in captured if o[0] in ("dc", "cs", "rst")][-4:]
-    assert tail == [("dc", 0), ("cs", 1, 0), ("rst", 0), ("cs", 1, 1)]
-    # DOCUMENTED stock behaviour / known deviations for hardware bring-up:
-    #  - final CS1 = high, RST = low, DC = low;
-    #  - CS2 is left as the last image/cog write set it (high), not re-cleared;
-    #  - panel power (GPIO48) is NOT turned off here (epd.py never toggles it).
+    tail = [o for o in captured if o[0] in ("dc", "cs", "rst")][-5:]
+    assert tail == [("dc", 0), ("cs", 1, 0), ("rst", 0), ("cs", 1, 1), ("cs", 2, 1)]
+    # DOCUMENTED stock behaviour, now fully asserted (both panels parked explicitly):
+    #  - final DC = low, RST = low;
+    #  - CS1 = high, CS2 = high (stock leaves CS2 high after its last write; the
+    #    driver now parks it explicitly rather than relying on the cmd() HAL);
+    #  - panel power (GPIO48) is NOT turned off here (epd.py never toggles it;
+    #    gating the rail on shutdown is a hardware-bring-up decision, kept out of
+    #    the golden sequence).
     assert not any(o[0] == "pwr" for o in captured), "seq must not touch power rail"
