@@ -13,7 +13,8 @@ Maps badge functionality to the tests that cover it. Legend: ✅ covered ·
 | Boot | easter egg at #42 + `never_epd.png` name | ✅ config | ⬜ | regression guard for the stock hyphen bug |
 | EPD | RGB565→black/red/white rule | ✅ pixel | — | cross-checked vs `emu.write_png` |
 | EPD | MONO_HLSB packing + red precedence | ✅ pixel | — | — |
-| EPD | CoG init / DC-DC / refresh command sequence | ⬜ | ◐ @wip fbdump | **gap**: add a golden-sequence test (my `epd.c` vs `epd.py`) |
+| EPD | CoG init / DC-DC / refresh command sequence | ✅ epd_sequence | ◐ fbdump | golden test vs epd.py; exercises shipped epd_seq.c |
+| EPD | shutdown pin states (CS/RST) symmetry | ✅ epd_sequence | — | documented stock states pinned |
 | EPD | rendered screen snapshot | ✅ write_png | ◐ @wip fbdump | needs T55 `badge_emu_fb_*` symbols |
 | LEDs | menu-bar mapping (page/cursor/colours) | ✅ led_menu | — | ported from `led_bar.py` |
 | LEDs | `bitmask_to_leds` | ✅ led_menu | — | — |
@@ -53,7 +54,6 @@ emulator contract (`badge_emu_fb_*`, `EMU_EPD_REFRESH`, `EMU_READY`, `@btn`,
 
 **Specced, pending more FIRMWARE (not hardware)** — QEMU-testable once built:
 - in-app day paging (schedule `@wip`), the TinyStories LLM run (`@wip @slow`);
-- EPD command-sequence golden test (driver bytes vs `epd.py`, issue #4);
 - real PNG decode + text-plate pixel assertions (issues #6), schedule parser in C
   (issue #7), TinyStories hardening (issue #8);
 - boot-flow fixtures for splash/#42 — need Copilot's `emu.make_flash` per-scenario FS helper.

@@ -32,19 +32,27 @@ python emulator/emu.py fbdump screen.png --wait-for 'EMU_EPD_REFRESH 1' --scale 
   `partitions.csv`). Without `vfs_root/data` (e.g. a fresh clone or CI; the badge assets aren't in git) it packs
   an empty LittleFS. `--fs DIR` picks another directory; `--no-fs` leaves the partition erased.
 - `test` exits 0 on pass, 1 on fail, and saves the serial log next to the build. It also fails fast if the
-  firmware reboots (panic/abort loop) instead of waiting for the timeout.
+  firmware reboots (panic/abort loop) instead of waiting for the timeout. Timeouts and rejected output both
+  exit 1; the error message distinguishes them.
+- `fbdump` reports GDB failures or missing/incomplete planes instead of using invalid framebuffer data.
 
 ## Scenario files
 
-One step per line (`python emulator/emu.py test -h` for the full list):
+One step per line (`python emulator/emu.py test -h` for the full list). Blank lines and lines starting with
+`#` are ignored; inline comments are not stripped:
 
 ```text
-expect 30 main_task: Calling app_main\(\)   # wait up to 30 s for a regex, after the previous match
-send hello                                  # text + CR to UART0
-button a                                    # badge button press (contract below)
-fbdump ../out/screen.png                    # dump e-paper planes to PNG via gdb
-reject Guru Meditation                      # fail if this ever appeared
+# Wait up to 30 s for a regex, after the previous match.
+expect 30 main_task: Calling app_main\(\)
+send hello
+button a
+fbdump ../out/screen.png
+# Fail if the pattern has appeared in output captured so far.
+reject Guru Meditation
 ```
+
+`send` and `button` append a carriage return; `sendraw` does not. The underlying Python `Qemu.send()`
+writes exactly the UTF-8 text supplied by its caller, without appending a line ending.
 
 ## What QEMU emulates for this badge
 

@@ -42,6 +42,28 @@ def ns(**kw):
     return argparse.Namespace(**{'no_fs': False, 'fs': None, 'fs_partition': 'storage', **kw})
 
 
+def valid_frame(w: int, h: int, enc: str, data: str) -> bool:
+    """True only for a complete two-plane (black || red) frame within the panel size.
+
+    Allocation is bounded by the panel size: base64 length is checked before decoding and zlib
+    output is capped at one byte past the expected size."""
+    if not (0 < w <= emu.EPD_W and 0 < h <= emu.EPD_H and w % 8 == 0) or enc not in ('raw', 'z'):
+        return False
+    want = 2 * (w // 8) * h
+    if len(data) > 4 * ((want + want // 100 + 64) // 3 + 1):
+        return False  # even incompressible zlib output stays near raw size
+    try:
+        raw = base64.b64decode(data, validate=True)
+        if enc == 'z':
+            d = zlib.decompressobj()
+            raw = d.decompress(raw, want + 1)
+            if not d.eof or d.unconsumed_tail or d.unused_data:
+                return False
+    except (ValueError, zlib.error):
+        return False
+    return len(raw) == want
+
+
 class Hub:
     """Fan-out of server-sent events to every open browser tab."""
 
@@ -267,9 +289,16 @@ class Dev:
 
     def frame_from_line(self, line: str, source: str) -> None:
         parts = line.split(' ', 4)
-        if len(parts) == 5:
-            self.publish_frame({'w': int(parts[1]), 'h': int(parts[2]), 'enc': parts[3], 'data': parts[4].strip(),
-                                'source': source})
+        if len(parts) != 5:
+            return
+        try:
+            w, h = int(parts[1]), int(parts[2])
+        except ValueError:
+            return  # corrupted serial line; don't kill the reader thread
+        data = parts[4].strip()
+        if not valid_frame(w, h, parts[3], data):
+            return
+        self.publish_frame({'w': w, 'h': h, 'enc': parts[3], 'data': data, 'source': source})
 
     def snapshot(self) -> None:
         self.snap_again = True

@@ -351,8 +351,11 @@ def read_planes(bdir: Path, port: int, black: str, red: str) -> tuple[bytes, byt
            '-ex', f'dump binary memory {out_r} ({red}) ({red})+{PLANE_BYTES}',
            '-ex', 'detach']
     res = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
-    if not out_b.exists() or not out_r.exists():
-        die(f'gdb could not read planes ({black}, {red}):\n{res.stdout}{res.stderr}')
+    sizes = [f.stat().st_size if f.is_file() else None for f in (out_b, out_r)]
+    if res.returncode != 0 or sizes != [PLANE_BYTES, PLANE_BYTES]:
+        die(f'gdb could not read planes ({black}, {red}) '
+            f'(exit {res.returncode}; sizes {sizes}, expected {PLANE_BYTES} bytes each):\n'
+            f'{res.stdout}{res.stderr}')
     return out_b.read_bytes(), out_r.read_bytes()
 
 
@@ -380,7 +383,7 @@ def write_png(path: Path, black: bytes, red: bytes, scale: int = 1) -> None:
 
 # ---------------------------------------------------------------- scenario tests
 
-SCENARIO_HELP = """Scenario file: one step per line, '#' comments.
+SCENARIO_HELP = """Scenario file: one step per line, '#' comment lines.
   expect <timeout_s> <regex>     wait for regex in serial output (after previous match)
   reject <regex>                 fail if regex appears anywhere in output so far
   send <text>                    send text + '\\r' to UART0 (use \\n, \\t escapes)

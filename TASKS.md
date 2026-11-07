@@ -130,6 +130,14 @@ Legend: ☐ TODO · ◐ DOING · ⟳ REVIEW · ✅ DONE · ⛔ BLOCKED
 ---
 
 ## Changelog
+- 2026-11-07 — Claude: **issue #4 EPD golden-sequence test.** Refactored the driver
+  sequence behind a HAL seam (`components/epd/epd_seq.c` + `epd_seq.h`; `epd.c` keeps
+  the GPIO/SPI HAL). `tests/unit/test_epd_sequence.py` compiles the *shipped*
+  `epd_seq.c`, drives it through a capture HAL (ctypes), and asserts the transcript
+  matches the stock `epd.py` reference (`tests/support/epd_sequence.py`): command
+  order (images before CoG init), DC-DC ramp values, and documented shutdown pin
+  states (CS1=high, RST=low, DC=low; CS2/power left as stock — flagged for hw bring-up).
+  169 unit tests pass; emulator builds (0x43a60, 91% free); preflight still green.
 - 2026-11-07 — Claude: **T55 / no-LVGL firmware pass.** Dropped LVGL; restored
   plane-based `components/epd` + `board`; new no-LVGL `app_main` with console
   (@btn/@app/EMU_READY), badge_core app-switcher, LED menu (EMU_LED), terminal echo,
