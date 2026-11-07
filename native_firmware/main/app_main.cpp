@@ -9,7 +9,8 @@
  *   - EMU_READY is printed once the console is reading input
  *   - a UART line "@btn <name>" injects a button; "@app <name>" launches an app;
  *     "@name <text>" sets the nametag string; "@gallery <n>" selects a gallery
- *     image (both re-render if their app is active)
+ *     image (both re-render if their app is active); "@boot <n>" renders the boot
+ *     image (splash/egg) for counter n (issue #3 test hook)
  *
  * App *content* (real PNG/text/schedule/LLM rendering) is deliberately minimal
  * here — each app draws an identifiable placeholder; issues #6/#7/#8 fill it in.
@@ -22,6 +23,7 @@
 #include "esp_log.h"
 #include "esp_heap_caps.h"
 #include "nvs_flash.h"
+#include "nvs.h"
 #include "esp_littlefs.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -123,6 +125,35 @@ void render_nametag()
     ESP_LOGI(TAG, "nametag rendered: \"%s\"", g_nametag);
 }
 
+/* Decode a PNG file straight into the (cleared) planes and refresh. Returns
+ * false on missing file / OOM / decode error (planes left cleared, no refresh);
+ * the ~w*h*4 RGBA buffer uses PSRAM (CONFIG_SPIRAM_USE_MALLOC=y). Shared by the
+ * Gallery (#6) and the boot splash/egg (#3). */
+bool render_png_file(const char *path, int *out_w, int *out_h)
+{
+    FILE *f = fopen(path, "rb");
+    if (!f) { ESP_LOGW(TAG, "png: %s not found", path); return false; }
+    fseek(f, 0, SEEK_END);
+    long len = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    if (len <= 0) { fclose(f); return false; }
+    uint8_t *buf = (uint8_t *)malloc((size_t)len);
+    if (!buf) { fclose(f); ESP_LOGE(TAG, "png: OOM reading %s", path); return false; }
+    size_t got = fread(buf, 1, (size_t)len, f);
+    fclose(f);
+
+    epd_clear();
+    int w = 0, h = 0;
+    unsigned err = badge_png_decode_to_planes(buf, got,
+                                              epd_black_plane(), epd_red_plane(), &w, &h);
+    free(buf);
+    if (err) { ESP_LOGE(TAG, "png: decode %s failed (%u)", path, err); return false; }
+    epd_refresh();
+    if (out_w) *out_w = w;
+    if (out_h) *out_h = h;
+    return true;
+}
+
 /* Gallery (issue #6): decode /data/gallery/NNN.png straight into the planes. */
 constexpr int kGalleryCount = 44;   /* 001.png .. 044.png (badge_spec GALLERY_COUNT) */
 int g_gallery_idx = 1;              /* 1-based currently-shown image */
@@ -131,34 +162,32 @@ void render_gallery()
 {
     char path[48];
     snprintf(path, sizeof(path), "/data/gallery/%03d.png", g_gallery_idx);
-
-    FILE *f = fopen(path, "rb");
-    if (!f) { ESP_LOGW(TAG, "gallery: %s not found", path); goto placeholder; }
-    {
-        fseek(f, 0, SEEK_END);
-        long len = ftell(f);
-        fseek(f, 0, SEEK_SET);
-        if (len <= 0) { fclose(f); goto placeholder; }
-        uint8_t *buf = (uint8_t *)malloc((size_t)len);
-        if (!buf) { fclose(f); ESP_LOGE(TAG, "gallery: OOM reading %s", path); goto placeholder; }
-        size_t got = fread(buf, 1, (size_t)len, f);
-        fclose(f);
-
-        epd_clear();
-        int w = 0, h = 0;
-        unsigned err = badge_png_decode_to_planes(buf, got,
-                                                  epd_black_plane(), epd_red_plane(), &w, &h);
-        free(buf);
-        if (err) { ESP_LOGE(TAG, "gallery: decode %s failed (%u)", path, err); goto placeholder; }
-        epd_refresh();
+    int w = 0, h = 0;
+    if (render_png_file(path, &w, &h)) {
         ESP_LOGI(TAG, "gallery rendered: %s (%dx%d)", path, w, h);
-        return;
+    } else {
+        epd_clear();
+        draw_border();
+        fill_rect_black(430, 286, 100, 100);
+        epd_refresh();
     }
-placeholder:
-    epd_clear();
-    draw_border();
-    fill_rect_black(430, 286, 100, 100);
-    epd_refresh();
+}
+
+/* Boot splash / easter egg (issue #3). badge_boot_image(): 1 = splash, 2 = egg.
+ * Filenames match badge_spec (SPLASH_IMAGE / EGG_IMAGE). Returns true if drawn. */
+bool render_boot_image(int which)
+{
+    const char *name = (which == 2) ? "never_epd.png" : "supercon-x-splash.png";
+    char path[56];
+    snprintf(path, sizeof(path), "/data/graphics/%s", name);
+    int w = 0, h = 0;
+    if (render_png_file(path, &w, &h)) {
+        ESP_LOGI(TAG, "boot_image: %s %s (%dx%d)",
+                 which == 2 ? "egg" : "splash", path, w, h);
+        return true;
+    }
+    ESP_LOGW(TAG, "boot_image: %s render failed", which == 2 ? "egg" : "splash");
+    return false;
 }
 
 /* Placeholder render for apps not yet built out (workshops, terminal, LLM):
@@ -239,6 +268,20 @@ void on_line(const char *line)
             } else {
                 ESP_LOGW(TAG, "gallery index %d out of 1..%d", n, kGalleryCount);
             }
+        } else if (strncmp(line, "@boot ", 6) == 0) {
+            /* Test hook: render the boot image for an arbitrary counter so the
+             * splash/egg decision + rendering can be checked deterministically. */
+            int n = atoi(line + 6);
+            int bi = badge_boot_image(n);
+            ESP_LOGI(TAG, "boot_image query n=%d -> %d", n, bi);
+            if (bi) {
+                render_boot_image(bi);
+            } else {
+                epd_clear();
+                draw_border();
+                epd_refresh();
+                ESP_LOGI(TAG, "boot_image: none");
+            }
         }
     } else if (!g_sw.selecting && strcmp(kApps[g_sw.active].name, "terminal") == 0) {
         /* Terminal app echoes console lines to the screen (and serial). */
@@ -285,6 +328,23 @@ esp_err_t mount_storage()
     return e;
 }
 
+/* Boot flow (issue #3): read + increment the persistent load counter in NVS,
+ * returning the new count. badge_next_load_counter is the pure badge_core rule
+ * (first boot -> 1, then +1 each boot). Survives reboots via NVS. */
+int read_and_bump_boot_counter()
+{
+    nvs_handle_t h;
+    if (nvs_open("badge", NVS_READWRITE, &h) != ESP_OK)
+        return 1;   /* no store -> treat as first boot */
+    int32_t cur = 0;
+    bool has = (nvs_get_i32(h, "load_counter", &cur) == ESP_OK);
+    int next = badge_next_load_counter(has ? 1 : 0, (int)cur);
+    nvs_set_i32(h, "load_counter", (int32_t)next);
+    nvs_commit(h);
+    nvs_close(h);
+    return next;
+}
+
 }  // namespace
 
 extern "C" void app_main(void)
@@ -314,6 +374,13 @@ extern "C" void app_main(void)
     } else if (psram_before && psram_before - psram_free < 2 * EPD_PLANE_BYTES) {
         ESP_LOGW(TAG, "planes do not appear to be in PSRAM (freed delta too small)");
     }
+
+    /* Boot flow (issue #3): bump the persistent counter and paint the splash on
+     * the early boots / the easter egg on boot #42, before handing to the apps. */
+    int boot_counter = read_and_bump_boot_counter();
+    ESP_LOGI(TAG, "boot #%d", boot_counter);
+    int boot_img = badge_boot_image(boot_counter);
+    if (boot_img) render_boot_image(boot_img);
 
     badge_switcher_init(&g_sw, kAppCount, 0);
     show_leds();
