@@ -85,17 +85,19 @@ def menu_leds(app_index: int, total_apps: int, num_leds: int = NUM_LEDS) -> List
     Page = index // 8, cursor = index % 8. A fully-populated page is filled with
     that page's background colour; a partial page fills only the first
     (total % 8) LEDs. The cursor LED is overpainted with the selected colour.
+    The palette cycles every 6 pages (page % 6), matching the firmware
+    (badge_core led_menu.c and badge_leds.cpp both wrap).
     """
     leds: List[Tuple[int, int, int]] = [(0, 0, 0)] * num_leds
     page = app_index // num_leds
     cursor = app_index % num_leds
-    bg = MENU_BACKGROUND_COLORS[page]
+    bg = MENU_BACKGROUND_COLORS[page % len(MENU_BACKGROUND_COLORS)]
     if page < total_apps // num_leds:
         leds = [bg] * num_leds
     else:
         for i in range(total_apps % num_leds):
             leds[i] = bg
-    leds[cursor] = MENU_SELECTED_COLORS[page]
+    leds[cursor] = MENU_SELECTED_COLORS[page % len(MENU_SELECTED_COLORS)]
     return leds
 
 

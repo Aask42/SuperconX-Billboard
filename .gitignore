@@ -37,7 +37,14 @@ dump/
 # Reference clones kept locally only (each has its own upstream git repo)
 ESP32-DIV/
 esp32-llm/
-native_firmware/third_party/
+# Third-party reference clones stay local, EXCEPT the llama2.c LICENSE:
+# tinystories_adapter.cpp is derived from it, so its MIT license must ship
+# in the public repo (attribution). Everything else under third_party/
+# remains ignored.
+native_firmware/third_party/*
+!native_firmware/third_party/llama2.c/
+native_firmware/third_party/llama2.c/*
+!native_firmware/third_party/llama2.c/LICENSE
 
 # Original extracted MicroPython firmware — kept local as the port's source reference.
 # Contains Hackaday/Supercon badge assets (gallery artwork, schedule) that are third-party;

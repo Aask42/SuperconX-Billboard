@@ -15,7 +15,7 @@ Maps badge functionality to the tests that cover it. Legend: ✅ covered ·
 | EPD | MONO_HLSB packing + red precedence | ✅ pixel | — | — |
 | EPD | CoG init / DC-DC / refresh command sequence | ⬜ | ◐ @wip fbdump | **gap**: add a golden-sequence test (my `epd.c` vs `epd.py`) |
 | EPD | rendered screen snapshot | ✅ write_png | ◐ @wip fbdump | needs T55 `badge_emu_fb_*` symbols |
-| LEDs | menu-bar mapping (page/cursor/colours) | ✅ led_menu | — | ported from `led_bar.py` |
+| LEDs | menu-bar mapping (page/cursor/colours) | ✅ led_menu | — | ported from `led_bar.py`; palette wrap past 6 pages regression-tested in C + spec (was an OOB read at app_index ≥ 48) |
 | LEDs | `bitmask_to_leds` | ✅ led_menu | — | — |
 | LEDs | submenu single-LED | ⬜ | — | minor gap |
 | LEDs | live LED output | — | ◐ @wip | needs `EMU_LED` (T55) |
@@ -26,7 +26,7 @@ Maps badge functionality to the tests that cover it. Legend: ✅ covered ·
 | Apps | Schedule + Workshops (parse, split) | ✅ schedule | ◐ @wip schedule | 43 rows, talks vs rooms |
 | Apps | Terminal echo | — | ◐ @wip terminal | — |
 | Apps | TinyStories LLM | ✅ llm_model | ◐ @wip tinystories | model/tokenizer format vs vocab 512 |
-| Assets | gallery/graphics/models/schedule staged | ✅ assets | — | guards the LittleFS payload |
+| Assets | gallery/graphics/models/schedule staged | ✅ assets | — | guards the LittleFS payload; payload tests skip (never fail) when `vfs_root` is not staged (clean clone) |
 | Emulator | harness helpers (partitions, png, littlefs) | ✅ emu_helpers | — | — |
 | Contract | T55 symbols + log formats present | — | ⬜ | **gap**: conformance scenario once firmware emits |
 
@@ -37,6 +37,8 @@ Maps badge functionality to the tests that cover it. Legend: ✅ covered ·
 `badge_spec.py` for the same inputs. So these rows are now backed by the **actual
 firmware C**, not only the reference model: pixel classification, MONO_HLSB
 packing, LED menu-bar mapping, and the load-counter / boot-image logic.
+Bounds regressions are pinned too: menu palette wrap at app_index ≥ 48 and
+`badge_plane_put` dropping out-of-range writes.
 Still model-only (no C yet): schedule parsing and app-switcher nav — they move to
 C-backed as I factor those into `badge_core`.
 

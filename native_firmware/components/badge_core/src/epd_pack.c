@@ -17,6 +17,14 @@ int badge_classify_pixel(int r5, int g6, int b5)
 
 void badge_plane_put(uint8_t *black, uint8_t *red, int x, int y, int stride, int cls)
 {
+    /* Bounds: the plane width is fully determined by stride (8 px per byte),
+       so x can be checked exactly; y is checked for negativity here and the
+       caller still owns keeping y within the plane height. Out-of-range
+       writes are dropped, never clipped into a neighbouring row. */
+    if (black == NULL || red == NULL || stride <= 0 ||
+        x < 0 || y < 0 || x >= stride * 8) {
+        return;
+    }
     int off = y * stride + (x >> 3);
     uint8_t mask = (uint8_t)(0x80 >> (x & 7));
     switch (cls) {

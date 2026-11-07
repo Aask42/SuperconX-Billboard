@@ -36,6 +36,8 @@ def lib(tmp_path_factory):
     dll.badge_menu_leds.argtypes = [ctypes.c_int, ctypes.c_int, ctypes.POINTER(ctypes.c_uint8)]
     dll.badge_rgb565_put.argtypes = [ctypes.POINTER(ctypes.c_uint8), ctypes.POINTER(ctypes.c_uint8),
                                      ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_uint16]
+    dll.badge_plane_put.argtypes = [ctypes.POINTER(ctypes.c_uint8), ctypes.POINTER(ctypes.c_uint8),
+                                    ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int]
     dll.badge_next_load_counter.restype = ctypes.c_int
     dll.badge_next_load_counter.argtypes = [ctypes.c_int, ctypes.c_int]
     dll.badge_boot_image.restype = ctypes.c_int
@@ -90,3 +92,33 @@ def test_config_helpers_match_spec(lib):
     _img = {None: 0, spec.SPLASH_IMAGE: 1, spec.EGG_IMAGE: 2}
     for counter in (0, 1, 2, 3, 41, 42, 43):
         assert lib.badge_boot_image(counter) == _img[spec.boot_image_for(counter)], counter
+
+
+def test_menu_leds_wraps_palette_past_six_pages(lib):
+    # Regression: badge_menu_leds indexed MENU_BG[page] with no wrap, reading
+    # out of bounds for app_index >= 48 (ASan-verified). The palette cycles
+    # every 6 pages, like badge_leds.cpp; the spec model wraps identically.
+    buf = (ctypes.c_uint8 * 24)()
+    for total in (48, 49, 56, 64):
+        for idx in range(total):
+            lib.badge_menu_leds(idx, total, buf)
+            got = [(buf[i * 3], buf[i * 3 + 1], buf[i * 3 + 2]) for i in range(8)]
+            assert got == spec.menu_leds(idx, total), (idx, total)
+
+
+def test_plane_put_drops_out_of_range_writes(lib):
+    # Regression: badge_plane_put had no bounds checks, so an off-panel pixel
+    # silently wrote into another row (or before the buffer). Out-of-range
+    # writes must now be dropped entirely.
+    stride = spec.STRIDE
+    black = (ctypes.c_uint8 * spec.PLANE_BYTES)()
+    red = (ctypes.c_uint8 * spec.PLANE_BYTES)()
+    lib.badge_plane_put(black, red, stride * 8, 0, stride, 1)      # x == width
+    lib.badge_plane_put(black, red, stride * 8 + 5, 3, stride, 2)  # x past width
+    lib.badge_plane_put(black, red, -1, 0, stride, 1)              # negative x
+    lib.badge_plane_put(black, red, 0, -1, stride, 1)              # negative y
+    lib.badge_rgb565_put(black, red, -8, -8, stride, 0x0000)       # via wrapper
+    assert not any(black) and not any(red)
+    # ...and an in-range write still lands.
+    lib.badge_plane_put(black, red, 0, 0, stride, 1)
+    assert black[0] == 0x80 and not any(red)
