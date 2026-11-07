@@ -28,6 +28,27 @@ def step_booted(context):
     context.qemu.expect(r"EMU_READY", 40)
 
 
+@given("the badge firmware booted with a corrupted filesystem")
+def step_booted_corrupt(context):
+    # Replace the storage partition in a copy of the flash image with garbage,
+    # then boot that image (snapshot, so nothing on disk changes). Proves the
+    # firmware survives a bad mount without auto-formatting (issue #9).
+    assert context.qemu is not None, "scenario missing @emu?"
+    context.qemu.close()
+    bdir = context.build_dir
+    parts = {p["name"]: p for p in context.emu.partitions(context.project, context.project)}
+    sto = parts["storage"]
+    data = bytearray((bdir / "emu_flash.bin").read_bytes())
+    end = min(sto["offset"] + sto["size"], len(data))
+    for i in range(sto["offset"], end):
+        data[i] = 0xAB
+    corrupt = bdir / "corrupt_flash.bin"
+    corrupt.write_bytes(data)
+    # Start it; the scenario asserts the mount-failure log (which precedes
+    # EMU_READY) and then that the firmware still reaches EMU_READY.
+    context.qemu = context.emu.Qemu(bdir, echo=False, flash=corrupt, snapshot=True)
+
+
 @then('I should see "{pattern}" within {timeout:d} seconds')
 @then('"{pattern}" appears within {timeout:d} seconds')
 def step_expect(context, pattern, timeout):

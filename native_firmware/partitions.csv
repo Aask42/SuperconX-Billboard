@@ -3,6 +3,14 @@
 # assets (graphics, gallery PNGs, schedule, and later the LLM model/tokenizer).
 # The stock badge formats its data partition as LittleFS; we do the same via the
 # joltwallet/littlefs managed component, mounted by the "storage" label.
+#
+# COREDUMP DECISION (issue #9/T59): NOT adding a coredump partition for now.
+# This layout matches the stock badge dump byte-for-byte (locked by
+# tests/unit/test_partition_safety.py); carving out a coredump region would
+# change offsets we can't validate without hardware, and live panics are already
+# decodable via the web UI / addr2line. Revisit only as a deliberate layout change
+# (update BADGE_REPORT.md + the guard test together) if on-flash crash capture is
+# needed after hardware bring-up.
 # Name,     Type, SubType, Offset,   Size
 nvs,        data, nvs,     0x9000,   0x6000,
 phy_init,   data, phy,     0xf000,   0x1000,

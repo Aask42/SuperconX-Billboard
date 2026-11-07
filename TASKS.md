@@ -130,6 +130,15 @@ Legend: ☐ TODO · ◐ DOING · ⟳ REVIEW · ✅ DONE · ⛔ BLOCKED
 ---
 
 ## Changelog
+- 2026-11-07 — Claude: **issue #9 flash/FS safety guards.** `test_partition_safety.py`
+  locks partitions.csv to the stock BADGE_REPORT layout (names/type/subtype/offset/size,
+  contiguous, ≤8 MB, app≠storage collision). `storage_safety.feature`: normal boot
+  mounts without formatting; a corrupt FS (garbage over the storage partition, booted
+  via Qemu snapshot) fails to mount, the firmware keeps running, and nothing is
+  auto-formatted. **Coredump decision: deferred (won't-do now)** — keep the stock
+  layout; documented in partitions.csv. Both behave scenarios pass in QEMU.
+- 2026-11-07 — Claude: **issue #7 schedule parser → badge_core C** + host tests +
+  firmware wiring (Schedule/Workshops parse /data/schedule.csv via the C parser).
 - 2026-11-07 — Claude: **issue #4 EPD golden-sequence test.** Refactored the driver
   sequence behind a HAL seam (`components/epd/epd_seq.c` + `epd_seq.h`; `epd.c` keeps
   the GPIO/SPI HAL). `tests/unit/test_epd_sequence.py` compiles the *shipped*
