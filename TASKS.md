@@ -190,3 +190,9 @@ Legend: ☐ TODO · ◐ DOING · ⟳ REVIEW · ✅ DONE · ⛔ BLOCKED
   fdbd897 and merged cloud PRs #8 (tinystories hardening) + #10 (release pipeline);
   origin/dev == origin/feat/esp-idf-scaffold. fix/review-batch-1 still needs Copilot
   to rebase (edits the deleted epd_panel.cpp).
+- 2026-11-07 — Claude: EPD shutdown parks CS2 high explicitly (epd_seq.c, commit
+  f1a5277) — resolves the turn-6 hw-bring-up flag and the EPD intent of
+  fix/review-batch-1, in the current architecture (PWR_EN left as stock). behave
+  assertion order corrected for nametag/gallery (stream-ordered; gallery verifies
+  image selection). #13 release-artifact contract tests landed (6 tests). 255 unit
+  tests pass. Trunk at f1a5277 (dev == feat/esp-idf-scaffold).
