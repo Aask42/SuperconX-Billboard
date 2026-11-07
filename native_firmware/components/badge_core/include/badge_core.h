@@ -41,6 +41,28 @@ void badge_rgb565_put(uint8_t *black, uint8_t *red, int x, int y, int stride, ui
 /* Fill out[8][3] (r,g,b, 0..3 range) for the given selection cursor. */
 void badge_menu_leds(int app_index, int total_apps, uint8_t out[8][3]);
 
+/* Submenu LED (led_bar.py submenu_display): a single lit LED per page. */
+void badge_submenu_leds(int item_index, uint8_t out[8][3]);
+
+/* ---- app switcher navigation (app_switcher.py) ---- */
+enum {
+    BADGE_BTN_MENU_MINUS = 0,
+    BADGE_BTN_MENU_PLUS  = 1,
+    BADGE_BTN_A          = 2,
+    BADGE_BTN_B          = 3,
+};
+
+typedef struct {
+    int count;      /* number of apps */
+    int selecting;  /* 1 = menu/selection mode, 0 = an app is running */
+    int selection;  /* cursor index while selecting */
+    int active;     /* launched app index */
+} badge_switcher_t;
+
+void badge_switcher_init(badge_switcher_t *s, int count, int initial);
+/* Apply a button event (BADGE_BTN_*). Returns 1 iff an app was just launched. */
+int badge_switcher_event(badge_switcher_t *s, int button);
+
 /* ---- boot flow / config (main.py) ---- */
 /* Next load_counter: current+1 if present, else 1. */
 int badge_next_load_counter(int has_counter, int current);

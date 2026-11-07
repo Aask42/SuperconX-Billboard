@@ -28,3 +28,13 @@ void badge_menu_leds(int app_index, int total_apps, uint8_t out[8][3])
     out[cursor][1] = MENU_SEL[1];
     out[cursor][2] = MENU_SEL[2];
 }
+
+void badge_submenu_leds(int item_index, uint8_t out[8][3])
+{
+    for (int i = 0; i < 8; i++) {
+        out[i][0] = out[i][1] = out[i][2] = 0;
+    }
+    const uint8_t *c = MENU_BG[item_index / 8];   /* SUBMENU_SELECTED_COLORS == MENU_BG */
+    int led = item_index % 8;
+    out[led][0] = c[0]; out[led][1] = c[1]; out[led][2] = c[2];
+}

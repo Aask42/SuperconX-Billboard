@@ -99,6 +99,46 @@ def menu_leds(app_index: int, total_apps: int, num_leds: int = NUM_LEDS) -> List
     return leds
 
 
+def submenu_leds(item_index: int, num_leds: int = NUM_LEDS) -> List[Tuple[int, int, int]]:
+    """Port of LedBar.submenu_display: one lit LED, coloured per page."""
+    leds: List[Tuple[int, int, int]] = [(0, 0, 0)] * num_leds
+    leds[item_index % num_leds] = MENU_BACKGROUND_COLORS[item_index // num_leds]
+    return leds
+
+
+# Button ids shared with badge_core (BADGE_BTN_*).
+BTN_MENU_MINUS, BTN_MENU_PLUS, BTN_A, BTN_B = 0, 1, 2, 3
+
+
+class Switcher:
+    """Reference port of app_switcher.py's navigation state machine."""
+
+    def __init__(self, count: int, initial: int = 0):
+        self.count = count
+        self.selecting = True
+        self.selection = initial
+        self.active = initial
+
+    def event(self, button: int) -> bool:
+        """Apply a button; return True iff an app was just launched."""
+        if self.count <= 0:
+            return False
+        if self.selecting:
+            if button == BTN_MENU_PLUS:
+                self.selection = (self.selection + 1) % self.count
+            elif button == BTN_MENU_MINUS:
+                self.selection = (self.selection - 1) % self.count
+            elif button in (BTN_A, BTN_B):
+                self.active = self.selection
+                self.selecting = False
+                return True
+        else:
+            if button in (BTN_MENU_MINUS, BTN_MENU_PLUS):
+                self.selecting = True
+                self.selection = self.active
+        return False
+
+
 def bitmask_to_leds(x: int, r: int = 3, g: int = 3, b: int = 3) -> List[Tuple[int, int, int]]:
     """Port of led_bar.bitmask_to_leds: 8-bit mask (MSB first) -> LED colours."""
     out = []

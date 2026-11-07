@@ -17,10 +17,10 @@ Maps badge functionality to the tests that cover it. Legend: ✅ covered ·
 | EPD | rendered screen snapshot | ✅ write_png | ◐ @wip fbdump | needs T55 `badge_emu_fb_*` symbols |
 | LEDs | menu-bar mapping (page/cursor/colours) | ✅ led_menu | — | ported from `led_bar.py` |
 | LEDs | `bitmask_to_leds` | ✅ led_menu | — | — |
-| LEDs | submenu single-LED | ⬜ | — | minor gap |
+| LEDs | submenu single-LED | ✅ c_core | — | C-backed |
 | LEDs | live LED output | — | ◐ @wip | needs `EMU_LED` (T55) |
 | Buttons | press → action | — | ◐ @wip | `@btn` (T55); no host debounce test (firmware-level) |
-| Apps | switcher nav (select/wrap/page) | ⬜ | ◐ @wip app_switch | **gap**: pure-C nav fn + host test once firmware exists |
+| Apps | switcher nav (select/wrap/launch/back) | ✅ c_core | ◐ @wip app_switch | C state machine vs model |
 | Apps | Nametag render | — | ◐ @wip app_switch | fbdump |
 | Apps | Gallery (44 PNGs, naming) | ✅ assets | ◐ @wip gallery | random/re-roll is firmware RNG — integration only |
 | Apps | Schedule + Workshops (parse, split) | ✅ schedule | ◐ @wip schedule | 43 rows, talks vs rooms |
@@ -33,27 +33,34 @@ Maps badge functionality to the tests that cover it. Legend: ✅ covered ·
 ## Host C tests (T13) — the C, not just the model
 
 `tests/unit/test_c_core.py` compiles `native_firmware/components/badge_core/`
-(`epd_pack.c`, `led_menu.c`, `config.c`) into a shared lib and asserts it matches
-`badge_spec.py` for the same inputs. So these rows are now backed by the **actual
-firmware C**, not only the reference model: pixel classification, MONO_HLSB
-packing, LED menu-bar mapping, and the load-counter / boot-image logic.
-Still model-only (no C yet): schedule parsing and app-switcher nav — they move to
-C-backed as I factor those into `badge_core`.
+(`epd_pack.c`, `led_menu.c`, `config.c`, `switcher.c`) into a shared lib and asserts
+it matches `badge_spec.py`. So these rows are backed by the **actual firmware C**:
+pixel classification, MONO_HLSB packing, LED menu + submenu, load-counter/boot-image,
+and the app-switcher navigation state machine. Still model-only: schedule CSV parsing
+(moves to C with the Schedule app).
 
-## Known gaps (to validate with Copilot / do next)
+## Pre-hardware verdict (no badge needed)
 
-1. **Boot-flow behave fixtures** — splash (counter<2) and egg (#42) need a
-   scenario-specific LittleFS with a doctored `panel_config.json`. `emu.py test`
-   takes `--fs DIR`; confirm that's the intended way to inject per-scenario data.
-2. **EPD command-sequence golden test** — host test asserting the driver emits the
-   exact CoG-init/DC-DC/refresh byte sequence from `epd.py` (no QEMU needed).
-3. **AppSwitcher nav unit test** — factor the select/wrap/page logic as a pure C
-   function so it's host-testable; add once the firmware exists (I own it now).
-4. **T55 contract-conformance scenario** — once the firmware exports
-   `badge_emu_fb_*` and logs `EMU_EPD_REFRESH`/`EMU_LED`, add a behave scenario that
-   checks the symbols (gdb) and log formats directly.
-5. **On-target Unity smoke** — real-hardware mount/refresh/button/LED; deferred
-   until we flash (user-gated).
+**Covered now and green** (45 pytest + behave boot in QEMU): every pure logic unit
+(classification, packing, LEDs, switcher nav, config/boot flow), the data/asset
+contracts (schedule, gallery, graphics, LLM model+tokenizer), the LittleFS packer,
+and that the firmware boots + mounts storage in QEMU without a panic. Nothing here
+needs the badge.
 
-Firmware features tagged `@wip` above convert to live acceptance tests as I wire
-the T55 logging into the no-LVGL firmware.
+**Specced, pending FIRMWARE (not hardware)** — runs in QEMU the moment the no-LVGL
+firmware emits the T55 signals; no badge required:
+- the `@wip` app behaviours (app-switch, nametag, gallery, schedule, terminal,
+  tinystories) — already written, gated on `EMU_READY`/`EMU_EPD_REFRESH`/`EMU_LED`/`@btn`;
+- EPD command-sequence golden test (driver bytes vs `epd.py`) — lands with the ported driver;
+- T55 contract-conformance scenario (gdb-checks `badge_emu_fb_*`, log formats);
+- schedule-parser C test (when parsing moves into `badge_core`);
+- boot-flow fixtures for splash/#42 — need Copilot's `emu.make_flash` per-scenario FS helper.
+
+**Genuinely HARDWARE-ONLY (correctly deferred until the badge is connected, user-gated):**
+- on-target Unity smoke: real SPI e-paper refresh + timing, WS2812 RMT output,
+  physical button GPIO/debounce, battery ADC, SAO I²C, flash/restore-to-stock,
+  USB-JTAG coredump pull. These cannot and should not have host/QEMU tests.
+
+Bottom line: the pre-hardware test scaffolding is complete for what exists today;
+the remaining non-hardware tests are blocked only on the firmware emitting the
+emulator contract, which is the next firmware pass — not on hardware.

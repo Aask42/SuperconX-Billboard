@@ -40,7 +40,16 @@ def lib(tmp_path_factory):
     dll.badge_next_load_counter.argtypes = [ctypes.c_int, ctypes.c_int]
     dll.badge_boot_image.restype = ctypes.c_int
     dll.badge_boot_image.argtypes = [ctypes.c_int]
+    dll.badge_submenu_leds.argtypes = [ctypes.c_int, ctypes.POINTER(ctypes.c_uint8)]
+    dll.badge_switcher_init.argtypes = [ctypes.POINTER(CSwitcher), ctypes.c_int, ctypes.c_int]
+    dll.badge_switcher_event.restype = ctypes.c_int
+    dll.badge_switcher_event.argtypes = [ctypes.POINTER(CSwitcher), ctypes.c_int]
     return dll
+
+
+class CSwitcher(ctypes.Structure):
+    _fields_ = [("count", ctypes.c_int), ("selecting", ctypes.c_int),
+                ("selection", ctypes.c_int), ("active", ctypes.c_int)]
 
 
 _CLS = {"white": 0, "black": 1, "red": 2}
@@ -90,3 +99,44 @@ def test_config_helpers_match_spec(lib):
     _img = {None: 0, spec.SPLASH_IMAGE: 1, spec.EGG_IMAGE: 2}
     for counter in (0, 1, 2, 3, 41, 42, 43):
         assert lib.badge_boot_image(counter) == _img[spec.boot_image_for(counter)], counter
+
+
+def test_submenu_leds_match_spec(lib):
+    buf = (ctypes.c_uint8 * 24)()
+    for item in range(0, 40):
+        lib.badge_submenu_leds(item, buf)
+        got = [(buf[i * 3], buf[i * 3 + 1], buf[i * 3 + 2]) for i in range(8)]
+        assert got == spec.submenu_leds(item), item
+
+
+def test_switcher_nav_matches_spec(lib):
+    # Run the same button script through the C state machine and the model and
+    # assert identical state + launch signal after every event.
+    script = [spec.BTN_MENU_PLUS, spec.BTN_MENU_PLUS, spec.BTN_MENU_MINUS,
+              spec.BTN_A, spec.BTN_MENU_PLUS, spec.BTN_MENU_PLUS, spec.BTN_B,
+              spec.BTN_MENU_MINUS, spec.BTN_MENU_MINUS, spec.BTN_A]
+    for count in (1, 3, 5):
+        cs = CSwitcher()
+        lib.badge_switcher_init(ctypes.byref(cs), count, 0)
+        model = spec.Switcher(count, 0)
+        for btn in script:
+            launched_c = lib.badge_switcher_event(ctypes.byref(cs), btn)
+            launched_m = model.event(btn)
+            assert bool(launched_c) == launched_m, (count, btn)
+            assert (cs.selecting, cs.selection, cs.active) == \
+                   (int(model.selecting), model.selection, model.active), (count, btn)
+
+
+def test_switcher_menu_plus_wraps(lib):
+    cs = CSwitcher()
+    lib.badge_switcher_init(ctypes.byref(cs), 3, 0)
+    for _ in range(3):
+        lib.badge_switcher_event(ctypes.byref(cs), spec.BTN_MENU_PLUS)
+    assert cs.selection == 0  # wrapped 0->1->2->0
+
+
+def test_switcher_menu_minus_wraps_negative(lib):
+    cs = CSwitcher()
+    lib.badge_switcher_init(ctypes.byref(cs), 3, 0)
+    lib.badge_switcher_event(ctypes.byref(cs), spec.BTN_MENU_MINUS)
+    assert cs.selection == 2  # 0 -> 2 (no negative index)
