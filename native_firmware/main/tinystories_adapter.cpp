@@ -14,8 +14,50 @@
 #include <stdlib.h>
 #include <string.h>
 
+#if defined(TINYSTORIES_HOST_BUILD)
+// Host-build seam: the parsing/generation core below is identical to what the
+// badge ships, but on the host (unit tests) we have no ESP-IDF. These tiny
+// shims stand in for the ESP allocation/RNG APIs so the SAME code compiles and
+// runs under a desktop toolchain (and ASan/UBSan). See tests/support/ and
+// tests/unit/test_tinystories_adapter.py. Nothing here changes the ESP-IDF
+// build, which still pulls in the real headers via the #else branch.
+#include <stdint.h>
+#ifndef MALLOC_CAP_8BIT
+#define MALLOC_CAP_8BIT (1u << 0)
+#endif
+#ifndef MALLOC_CAP_SPIRAM
+#define MALLOC_CAP_SPIRAM (1u << 10)
+#endif
+static inline void* heap_caps_malloc(size_t bytes, uint32_t /*caps*/) {
+    return malloc(bytes);
+}
+static inline void heap_caps_free(void* ptr) { free(ptr); }
+// Deterministic stand-in for esp_random(); the adapter only calls this when a
+// caller passes seed == 0, which the host tests avoid for reproducibility.
+static inline uint32_t esp_random(void) {
+    static uint32_t state = 0x6d7a1f3bu;
+    state = state * 1664525u + 1013904223u;
+    return state;
+}
+// The badge mounts its model/tokenizer under the "/data" LittleFS volume, which
+// valid_data_path() enforces. On the host there is no such volume, so this shim
+// transparently redirects a "/data/..." open to a writable directory named by
+// the TINYSTORIES_HOST_DATA_ROOT env var. valid_data_path() itself is left
+// unchanged, so the host tests still exercise the real "/data"-prefix rule.
+static inline FILE* tinystories_host_fopen(const char* path, const char* mode) {
+    const char* root = getenv("TINYSTORIES_HOST_DATA_ROOT");
+    if (root != nullptr && strncmp(path, "/data/", 6) == 0) {
+        static char redirected[4096];
+        snprintf(redirected, sizeof(redirected), "%s/%s", root, path + 6);
+        return fopen(redirected, mode);
+    }
+    return fopen(path, mode);
+}
+#define fopen(path, mode) tinystories_host_fopen((path), (mode))
+#else
 #include "esp_heap_caps.h"
 #include "esp_random.h"
+#endif
 
 namespace tinystories {
 namespace {
