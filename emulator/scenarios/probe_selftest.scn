@@ -5,6 +5,7 @@ expect 10 PLANES_READY
 reject PLANES_FAIL
 expect 10 FS:emulator littlefs ok
 expect 10 EMU_EPD_REFRESH 1
+expect 10 EMU_READY
 send hello badge
 expect 5 ECHO:hello badge
 button menu_plus

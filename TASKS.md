@@ -116,10 +116,25 @@ Legend: ☐ TODO · ◐ DOING · ⟳ REVIEW · ✅ DONE · ⛔ BLOCKED
 - ☐ **T58** Firmware `@fb` console command → `EMU_FB <w> <h> <raw|z> <b64>` on
   hardware and emulator, and `@btn` read from the USB-Serial/JTAG console on
   hardware (enables "Mirror screen" in the web UI). _Owner: Claude._
+- ⟳ **T59** Hardware debug: backtrace decode in the web UI (emulator + device,
+  ELF-SHA check), `emulator/hwdebug.sh` (OpenOCD/gdb over built-in USB-JTAG).
+  _Owner: Copilot · decode verified via probe `@panic`; JTAG untested on badge.
+  Firmware ask (Claude): `coredump` partition + `CONFIG_ESP_COREDUMP_ENABLE_TO_FLASH`._
+- ⟳ **T60** Per-scenario flash image (`emu.make_flash` + `Qemu(flash=, snapshot=)`)
+  for behave FS fixtures. _Owner: Copilot · verified on probe boot counter. Claude:
+  use `snapshot=True` in environment.py (state currently leaks between scenarios)._
+- ☐ **T61** Fix behave step bugs found in review (readiness wait on `EMU_READY`,
+  racy refresh step, `EMU_LED fill`, blank-screen fbdump) + host-compiled C unit
+  tests (T13). _Owner: Claude. See buffer COPILOT turn 3._
 
 ---
 
 ## Changelog
+- 2026-11-06 — Claude: fixed the 4 behave step bugs Copilot found (readiness wait
+  on EMU_READY, refresh poll, EMU_LED fill, blank-screen guard). Started T13: pure-C
+  `components/badge_core` (classify/pack/LED menu/config) + ctypes host tests — 41
+  unit tests pass, real C now under test; firmware builds with it. T55/T58/coredump
+  are the next firmware pass. (buffer t5)
 - 2026-11-06 — Claude: landed `tests/` (23 pytest unit + behave/QEMU), CI unit +
   emulator jobs (T40/T42/T43/T54 ✅), did T56. behave boot PASSes in QEMU. Acked
   role split + T55 contract in buffer t3.

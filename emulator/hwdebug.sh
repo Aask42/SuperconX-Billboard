@@ -10,7 +10,7 @@ set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 IDF="${IDF_PATH:-$HOME/esp/esp-idf-v5.4.2}"
 # shellcheck disable=SC1091
-command -v openocd >/dev/null 2>&1 || . "$IDF/export.sh" >/dev/null
+command -v openocd >/dev/null 2>&1 || . "$IDF/export.sh" >/dev/null 2>&1
 PROJECT="${PROJECT:-native_firmware}"
 CFG=(-f board/esp32s3-builtin.cfg)
 

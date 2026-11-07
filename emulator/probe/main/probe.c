@@ -106,11 +106,24 @@ void app_main(void)
             fclose(f);
         }
         printf("FS:%s", f ? txt : "missing\n");
+        int boots = 0;
+        FILE *bc = fopen("/data/boots.txt", "r");
+        if (bc) {
+            if (fscanf(bc, "%d", &boots) != 1) boots = 0;
+            fclose(bc);
+        }
+        bc = fopen("/data/boots.txt", "w");
+        if (bc) {
+            fprintf(bc, "%d\n", ++boots);
+            fclose(bc);
+        }
+        printf("BOOTS:%d\n", boots);
     } else {
         printf("FS:mount failed\n");
     }
     render();
     uart_driver_install(UART_NUM_0, 1024, 0, 0, NULL, 0);
+    printf("EMU_READY\n");
     char line[128];
     size_t n = 0;
     for (;;) {

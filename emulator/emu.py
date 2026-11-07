@@ -199,13 +199,39 @@ def cmd_image(args) -> Path:
     return flash
 
 
+def make_flash(project: Path, fs_dir: Path, out: Path, fs_partition: str = 'storage') -> Path:
+    """Copy the built emu_flash.bin to `out` with `fs_dir` packed into the LittleFS partition.
+
+    For per-test filesystem fixtures (e.g. a doctored panel_config.json); the shared image is untouched.
+    """
+    project = Path(project).resolve()
+    bdir = build_dir(project)
+    base = bdir / 'emu_flash.bin'
+    if not base.exists():
+        die(f'{base} missing; run `emu.py image` first')
+    part = next((p for p in partitions(project, bdir) if p['name'] == fs_partition), None)
+    if part is None:
+        die(f'no partition named {fs_partition!r} in partitions.csv')
+    out = Path(out)
+    fs_img = out.with_suffix('.fs.bin')
+    make_littlefs(Path(fs_dir), part['size'], fs_img)
+    img = bytearray(base.read_bytes())
+    img[part['offset']:part['offset'] + part['size']] = fs_img.read_bytes()
+    out.write_bytes(img)
+    fs_img.unlink()
+    return out
+
+
 # ---------------------------------------------------------------- qemu
 
-def qemu_args(bdir: Path, serial: str, gdb_port: int | None = None) -> list[str]:
+def qemu_args(bdir: Path, serial: str, gdb_port: int | None = None, flash: Path | None = None,
+              snapshot: bool = False) -> list[str]:
+    """snapshot=True discards the firmware's flash writes (NVS, LittleFS) when QEMU exits."""
     q = qemu_bin()
+    drive = f'file={flash or bdir / "emu_flash.bin"},if=mtd,format=raw' + (',snapshot=on' if snapshot else '')
     args = [q, '-M', 'esp32s3', '-m', PSRAM,
             '-global', 'driver=ssi_psram,property=is_octal,value=true',
-            '-drive', f'file={bdir / "emu_flash.bin"},if=mtd,format=raw',
+            '-drive', drive,
             '-drive', f'file={bdir / "emu_efuse.bin"},if=none,format=raw,id=efuse',
             '-global', f'driver={efuse_device(q)},property=drive,value=efuse',
             '-nic', 'none', '-display', 'none', '-serial', serial]
@@ -220,8 +246,8 @@ class Qemu:
     """QEMU with UART0 on a pipe; output is accumulated for expect()."""
 
     def __init__(self, bdir: Path, gdb_port: int | None = None, echo: bool = True, log: Path | None = None,
-                 on_output=None, keep: bool = True):
-        self.proc = subprocess.Popen(qemu_args(bdir, 'stdio', gdb_port), stdin=subprocess.PIPE,
+                 on_output=None, keep: bool = True, flash: Path | None = None, snapshot: bool = False):
+        self.proc = subprocess.Popen(qemu_args(bdir, 'stdio', gdb_port, flash, snapshot), stdin=subprocess.PIPE,
                                      stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         self.buf = ''
         self.pos = 0

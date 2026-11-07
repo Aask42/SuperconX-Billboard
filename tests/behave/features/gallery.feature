@@ -5,7 +5,7 @@ Feature: Gallery app
 
   @fbdump
   Scenario: Launching the Gallery paints an image
-    Given the badge firmware is running in the emulator
+    Given the badge firmware has booted
     When I type "@app gallery" on the serial console
     Then at least 1 e-paper refresh has occurred
     And the e-paper screen is saved to "gallery.png"

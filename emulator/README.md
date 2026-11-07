@@ -69,6 +69,8 @@ When `CONFIG_BADGE_EMULATOR=y`:
 4. **Screen mirror (also on real hardware, any build):** a console line `@fb` prints one line
    `EMU_FB <w> <h> <raw|z> <base64(black plane || red plane)>`; `z` = zlib-compressed. The web UI uses it
    to show the real badge's screen over Web Serial. `@btn` should also work on hardware (USB-Serial/JTAG console).
+5. **Ready marker:** print `EMU_READY` once the console is reading input. Input sent before it is lost
+   (verified on the probe), so tests and the UI must wait for it before sending `@btn`.
 
 ## Web UI (Chrome)
 
@@ -85,7 +87,35 @@ emulator/web/start.sh                       # native_firmware; or: --project ../
   Flash writes it with vendored [esptool-js](web/vendor/esptool-js) (bootloader, partition table, app, and
   optionally the LittleFS image). Every flash asks for confirmation; flash-on-save is opt-in.
 - The server binds to 127.0.0.1 only and rejects cross-origin POSTs. API: `/api/state`, `/api/events` (SSE),
-  `/api/build`, `/api/emu/{start,stop,send,button,snapshot}`, `/api/watch`, `/api/manifest`, `/api/fw/<file>`.
+  `/api/build`, `/api/emu/{start,stop,send,button,snapshot}`, `/api/watch`, `/api/manifest`, `/api/fw/<file>`,
+  `/api/decode`.
+
+## Test isolation and filesystem fixtures
+
+`emu.Qemu(bdir)` boots the shared `emu_flash.bin`, and the firmware's NVS and LittleFS writes persist into it,
+so a counter bumped in one test is still bumped in the next. For tests:
+
+```python
+q = emu.Qemu(bdir, snapshot=True)                       # writes are discarded on exit
+img = emu.make_flash(project, fixture_dir, tmp / 'f.bin')  # copy of the image with fixture_dir as LittleFS
+q = emu.Qemu(bdir, flash=img, snapshot=True)
+```
+
+Verified on the probe (`BOOTS:n` counter in `/data/boots.txt`): snapshot keeps it at 1, default goes 1 → 2,
+and a fixture with `boots.txt = 41` boots to 42 without touching the shared image.
+
+## Debugging on real hardware
+
+- **Crash backtraces:** panic lines (`Guru Meditation`, `PC :`, `Backtrace:`) in either serial log are decoded
+  to `function at file:line` with addr2line against the matching build (emulator ELF, or the "Compile for badge"
+  ELF for the device). If the badge's `ELF file SHA256` doesn't match the local build, the UI warns. Try it on
+  the probe: type `@panic` in the emulator serial input.
+- **JTAG over the same USB-C cable** (ESP32-S3 built-in USB-JTAG, no probe needed), via `emulator/hwdebug.sh`:
+  `check` (attach, read PC, detach), `openocd` (gdb :3333), `gdb [ELF]` (resets + halts the badge, breaks at
+  `app_main`), `decode ELF ADDR...`. Nothing in it writes flash. If attach fails while the Web Serial monitor is
+  connected, disconnect it in the UI and retry (untested whether macOS lets both share the composite device).
+- **Not yet:** core dump to flash (needs a `coredump` partition + `CONFIG_ESP_COREDUMP_ENABLE_TO_FLASH`; firmware
+  owner).
 
 ## CI
 

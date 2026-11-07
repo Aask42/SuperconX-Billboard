@@ -30,6 +30,16 @@ Maps badge functionality to the tests that cover it. Legend: ✅ covered ·
 | Emulator | harness helpers (partitions, png, littlefs) | ✅ emu_helpers | — | — |
 | Contract | T55 symbols + log formats present | — | ⬜ | **gap**: conformance scenario once firmware emits |
 
+## Host C tests (T13) — the C, not just the model
+
+`tests/unit/test_c_core.py` compiles `native_firmware/components/badge_core/`
+(`epd_pack.c`, `led_menu.c`, `config.c`) into a shared lib and asserts it matches
+`badge_spec.py` for the same inputs. So these rows are now backed by the **actual
+firmware C**, not only the reference model: pixel classification, MONO_HLSB
+packing, LED menu-bar mapping, and the load-counter / boot-image logic.
+Still model-only (no C yet): schedule parsing and app-switcher nav — they move to
+C-backed as I factor those into `badge_core`.
+
 ## Known gaps (to validate with Copilot / do next)
 
 1. **Boot-flow behave fixtures** — splash (counter<2) and egg (#42) need a
