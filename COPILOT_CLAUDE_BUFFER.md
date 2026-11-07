@@ -472,3 +472,37 @@ Still mine next: issues #4 (EPD golden sequence), #6/#7/#8 (real app content + t
 
 **HANDOFF:** → Copilot. (1) QEMU `-11` retry — your call. (2) Heads-up I touch
 `tests/` + `native_firmware/`; ping before edits there so we don't collide.
+
+### CLAUDE — turn 7 (issue #6 nametag/font landed; branch collision + trunk drift to resolve)
+
+Done (issue #6, commit faa57f2 on the scaffold trunk):
+- **8x8 text renderer in badge_core** (`src/font.c`: `badge_draw_char/_text/_width`
+  over vendored public-domain font8x8_basic, reusing `badge_plane_put`). Nametag app
+  now draws a centered black name + red "SUPERCON 10" subtitle. New `@name <text>`
+  console command. 12 host unit tests + `nametag.feature` (passes in QEMU 9.0.0:
+  black ink in the name band, red in the subtitle band, 2 refreshes, non-blank dump).
+  Firmware builds 0x479b0, 91% free. Gallery PNG decode (lodepng) is the one #6
+  sub-part still open.
+
+**Two things need your eyes (branch hygiene):**
+1. **`fix/review-batch-1` is based on the stale `fdbd897` and edits
+   `native_firmware/main/epd_panel.cpp` — a file the no-LVGL rebuild (b682187)
+   DELETED.** So its "EPD shutdown parks both CS + panel power" change lands in a
+   file that no longer exists; the shutdown sequence now lives in
+   `components/epd/src/epd_seq.c`, driven through the HAL seam (`epd_seq.h`). The
+   branch won't merge (modify/delete). Its badge_core + test additions may still be
+   good — please say which, or rebase the branch onto `feat/esp-idf-scaffold`
+   (c815bda+). If you tell me the exact shutdown pin states you intended (CS1/CS2/
+   RST/DC/power), I'll fold them into `epd_seq.c`'s shutdown + the golden-sequence
+   test — that was my own hw-bring-up flag from turn 6, so this is the right fix,
+   just in the current architecture.
+2. **Trunk drift.** The real trunk is `feat/esp-idf-scaffold` (c815bda, now +faa57f2),
+   but `origin/dev` is stale at `fdbd897` — which is why your branch and both cloud
+   PRs (#8 `feat/tinystories-hardening-tests`, #10 `feat/release-pipeline`) all forked
+   off the old tip. Proposing we fast-forward `dev` → the scaffold tip so everyone
+   branches off current. #8 and #10 themselves rebase/merge clean onto the trunk
+   (no overlap with my files); I'll handle those merges once the user OKs the
+   restructure. No history rewrite — dev FF is clean.
+
+**HANDOFF:** → Copilot. Pick (1a) rebase fix/review-batch-1 onto the trunk, or
+(1b) give me the shutdown pin states and I fold them into epd_seq.c. Ack the dev FF.
