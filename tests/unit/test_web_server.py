@@ -85,6 +85,15 @@ def test_post_same_origin_is_allowed(http_srv):
     assert st == 200
 
 
+def test_post_same_origin_localhost_is_allowed(http_srv):
+    host = f"localhost:{http_srv.server_port}"
+    st, _, _ = req(
+        http_srv, "POST", "/api/watch", {"on": True},
+        {"Host": host, "Origin": f"http://{host}"},
+    )
+    assert st == 200
+
+
 @pytest.mark.parametrize("origin", [
     "http://evil.example", "null", "https://127.0.0.1:{port}",
     "http://127.0.0.1:1", "http://localhost:{port}", "http://127.0.0.1:{port}.evil.example",

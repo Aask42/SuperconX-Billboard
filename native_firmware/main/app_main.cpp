@@ -58,10 +58,39 @@ void fill_rect_black(int x0, int y0, int w, int h)
     }
 }
 
+/* Schedule/Workshops read the real CSV through the badge_core C parser (issue #7).
+ * Text rendering of the rows needs the font work (issue #6); for now we parse and
+ * log so the data path is exercised and testable. */
+void maybe_load_schedule(int idx)
+{
+    const char *n = kApps[idx].name;
+    bool is_sched = (strcmp(n, "schedule") == 0);
+    bool is_work = (strcmp(n, "workshops") == 0);
+    if (!is_sched && !is_work) return;
+
+    FILE *f = fopen("/data/schedule.csv", "rb");
+    if (!f) { ESP_LOGW(TAG, "schedule.csv not found"); return; }
+    static char buf[8192];
+    size_t r = fread(buf, 1, sizeof(buf) - 1, f);
+    fclose(f);
+    buf[r] = 0;
+
+    static badge_talk_t talks[128];
+    int cnt = badge_schedule_parse(buf, talks, 128);
+    int shown = 0;
+    const char *first = "";
+    for (int i = 0; i < cnt; i++) {
+        bool talk = badge_schedule_is_talk(talks[i].stage);
+        if (talk == is_sched) { if (!shown) first = talks[i].talk; shown++; }
+    }
+    ESP_LOGI(TAG, "schedule: parsed %d rows, %d for %s; first=\"%s\"", cnt, shown, n, first);
+}
+
 /* Placeholder render: a border plus a per-app block so the screen is non-blank
  * and distinguishable. Replaced by real app rendering in issues #6/#7/#8. */
 void render_app(int idx)
 {
+    maybe_load_schedule(idx);
     epd_clear();
     fill_rect_black(0, 0, EPD_WIDTH, 8);
     fill_rect_black(0, EPD_HEIGHT - 8, EPD_WIDTH, 8);

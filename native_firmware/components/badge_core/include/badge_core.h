@@ -63,6 +63,25 @@ void badge_switcher_init(badge_switcher_t *s, int count, int initial);
 /* Apply a button event (BADGE_BTN_*). Returns 1 iff an app was just launched. */
 int badge_switcher_event(badge_switcher_t *s, int button);
 
+/* ---- schedule.csv parsing (Schedule / Workshops apps) ---- */
+typedef struct {
+    char day[8];
+    char time[8];
+    char stage[24];
+    char talk[128];
+    char speaker[64];
+    char image[40];
+} badge_talk_t;
+
+/* Parse schedule.csv text into out[0..max). Skips the header, blank lines, and
+ * malformed rows (field count != 6, or a time that is not H:MM / HH:MM). Handles
+ * RFC4180 quoting so a comma inside a quoted talk title stays one field, and
+ * CRLF line endings. Returns the number of talks written. No allocation. */
+int badge_schedule_parse(const char *csv, badge_talk_t *out, int max);
+
+/* True if a stage is a talk track (Lamarr/Hopper) vs a workshop room. */
+int badge_schedule_is_talk(const char *stage);
+
 /* ---- boot flow / config (main.py) ---- */
 /* Next load_counter: current+1 if present, else 1. */
 int badge_next_load_counter(int has_counter, int current);

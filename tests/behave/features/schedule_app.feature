@@ -5,10 +5,11 @@ Feature: Schedule and Workshops apps
   needs the apps plus the T55 refresh/button logging.
 
   @fbdump
-  Scenario: The Schedule app renders a day of talks
+  Scenario: The Schedule app parses the CSV and renders
     Given the badge firmware has booted
     When I type "@app schedule" on the serial console
-    Then at least 1 e-paper refresh has occurred
+    Then I should see "schedule: parsed" within 10 seconds
+    And at least 1 e-paper refresh has occurred
     And the e-paper screen is saved to "schedule.png"
 
   @wip
