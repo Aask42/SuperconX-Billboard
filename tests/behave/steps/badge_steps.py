@@ -121,6 +121,21 @@ def step_pixel(context, x, y, color):
     assert got == color, f"pixel ({x},{y}) is {got}, expected {color}"
 
 
+@then('the panel has {color} ink in rows {y0:d} to {y1:d}')
+def step_region_ink(context, color, y0, y1):
+    assert context.gdb_port, "scenario needs the @fbdump tag to open a gdb stub"
+    black, red = context.emu.read_planes(
+        context.build_dir, context.gdb_port, "badge_emu_fb_black", "badge_emu_fb_red"
+    )
+    buf = red if color == "red" else black
+    count = sum(
+        _plane_bit(buf, x, y)
+        for y in range(max(0, y0), min(672, y1))
+        for x in range(960)
+    )
+    assert count > 0, f"no {color} ink in rows {y0}..{y1} (expected rendered text there)"
+
+
 @then('the e-paper screen is saved to "{name}"')
 def step_fbdump(context, name):
     assert context.gdb_port, "scenario needs the @fbdump tag to open a gdb stub"

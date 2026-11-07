@@ -37,6 +37,23 @@ void badge_plane_put(uint8_t *black, uint8_t *red, int x, int y, int stride, int
 /* Classify a packed RGB565 value and write it straight into the planes. */
 void badge_rgb565_put(uint8_t *black, uint8_t *red, int x, int y, int stride, uint16_t rgb565);
 
+/* ---- text rendering (vendored 8x8 public-domain font, basic latin) ---- */
+/* Draw one ASCII glyph with its top-left at pixel (x,y), in colour class `cls`
+ * (BADGE_PX_BLACK/RED/WHITE). `scale` (>=1) enlarges each glyph dot to
+ * scale*scale px. Dots outside the 960x672 panel are clipped. A code point
+ * outside 0..127 draws nothing. Bit order matches the font: LSB = leftmost. */
+void badge_draw_char(uint8_t *black, uint8_t *red, int x, int y, char c, int cls, int scale);
+
+/* Draw a NUL-terminated string from (x,y) left to right. Each glyph advances
+ * (8+1)*scale px; '\n' returns to the start column and drops one line
+ * ((8+1)*scale px). Returns the x pixel just past the last glyph on the final
+ * line (useful for appending). Clips to the panel. */
+int badge_draw_text(uint8_t *black, uint8_t *red, int x, int y, const char *s, int cls, int scale);
+
+/* Pixel width the widest line of `s` occupies at `scale` (for centering).
+ * Matches badge_draw_text advance: (9*chars - 1)*scale, max over lines, >=0. */
+int badge_text_width(const char *s, int scale);
+
 /* ---- LED menu bar (ported from led_bar.py menu_display) ---- */
 /* Fill out[8][3] (r,g,b, 0..3 range) for the given selection cursor. */
 void badge_menu_leds(int app_index, int total_apps, uint8_t out[8][3]);

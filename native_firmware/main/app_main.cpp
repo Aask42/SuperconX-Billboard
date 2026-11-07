@@ -7,7 +7,8 @@
  *   - epd exposes badge_emu_fb_black/red and logs EMU_EPD_REFRESH <n> per refresh
  *   - badge_leds logs EMU_LED lines
  *   - EMU_READY is printed once the console is reading input
- *   - a UART line "@btn <name>" injects a button; "@app <name>" launches an app
+ *   - a UART line "@btn <name>" injects a button; "@app <name>" launches an app;
+ *     "@name <text>" sets the nametag string (re-renders if nametag is active)
  *
  * App *content* (real PNG/text/schedule/LLM rendering) is deliberately minimal
  * here — each app draws an identifiable placeholder; issues #6/#7/#8 fill it in.
@@ -86,16 +87,50 @@ void maybe_load_schedule(int idx)
     ESP_LOGI(TAG, "schedule: parsed %d rows, %d for %s; first=\"%s\"", cnt, shown, n, first);
 }
 
-/* Placeholder render: a border plus a per-app block so the screen is non-blank
- * and distinguishable. Replaced by real app rendering in issues #6/#7/#8. */
-void render_app(int idx)
+void draw_border()
 {
-    maybe_load_schedule(idx);
-    epd_clear();
     fill_rect_black(0, 0, EPD_WIDTH, 8);
     fill_rect_black(0, EPD_HEIGHT - 8, EPD_WIDTH, 8);
     fill_rect_black(0, 0, 8, EPD_HEIGHT);
     fill_rect_black(EPD_WIDTH - 8, 0, 8, EPD_HEIGHT);
+}
+
+/* Draw `s` centered horizontally at row `y` in colour `cls` at `scale` (issue #6). */
+void draw_centered(const char *s, int y, int cls, int scale)
+{
+    uint8_t *blk = epd_black_plane();
+    uint8_t *red = epd_red_plane();
+    int w = badge_text_width(s, scale);
+    int x = (EPD_WIDTH - w) / 2;
+    if (x < 0) x = 0;
+    badge_draw_text(blk, red, x, y, s, cls, scale);
+}
+
+/* Nametag (issue #6): big centered name in black, event subtitle in red.
+ * Mutable so it can be set at runtime (and via `@name <text>` under the emulator). */
+char g_nametag[32] = "HACKER";   /* default until the user sets one */
+
+void render_nametag()
+{
+    epd_clear();
+    draw_border();
+    draw_centered(g_nametag, 230, BADGE_PX_BLACK, 8);   /* 64px-tall glyphs */
+    draw_centered("SUPERCON 10", 420, BADGE_PX_RED, 4); /* 32px red subtitle */
+    epd_refresh();
+    ESP_LOGI(TAG, "nametag rendered: \"%s\"", g_nametag);
+}
+
+/* Placeholder render for apps not yet built out (gallery/#6-PNG, workshops, LLM):
+ * a border plus a per-app block so the screen is non-blank and distinguishable. */
+void render_app(int idx)
+{
+    maybe_load_schedule(idx);
+    if (strcmp(kApps[idx].name, "nametag") == 0) {
+        render_nametag();
+        return;
+    }
+    epd_clear();
+    draw_border();
     fill_rect_black(40 + idx * 120, 60, 100, 100);
     epd_refresh();
     ESP_LOGI(TAG, "rendered app '%s'", kApps[idx].name);
@@ -150,6 +185,11 @@ void on_line(const char *line)
             int i = app_index_by_name(line + 5);
             if (i >= 0) launch(i);
             else ESP_LOGW(TAG, "unknown @app %s", line + 5);
+        } else if (strncmp(line, "@name ", 6) == 0) {
+            snprintf(g_nametag, sizeof(g_nametag), "%s", line + 6);
+            ESP_LOGI(TAG, "nametag set: \"%s\"", g_nametag);
+            if (!g_sw.selecting && app_index_by_name("nametag") == g_sw.active)
+                render_app(g_sw.active);
         }
     } else if (!g_sw.selecting && strcmp(kApps[g_sw.active].name, "terminal") == 0) {
         /* Terminal app echoes console lines to the screen (and serial). */
