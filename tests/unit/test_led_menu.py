@@ -34,6 +34,15 @@ def test_second_page_uses_second_background_colour():
     assert leds[0] == MENU_BACKGROUND_COLORS[1]
 
 
+def test_large_app_count_does_not_overflow_palette():
+    # Regression for the OOB flagged in issue #5: 48+ apps -> page >= 6.
+    for total in (48, 49, 56, 64):
+        for idx in range(total):
+            leds = menu_leds(idx, total)          # must not raise
+            assert len(leds) == 8
+            assert leds[idx % 8] == MENU_SELECTED_COLORS[0]
+
+
 def test_bitmask_msb_first():
     leds = bitmask_to_leds(0b1000_0001, r=3, g=3, b=3)
     assert leds[0] == (3, 3, 3)       # MSB -> LED 0

@@ -89,20 +89,23 @@ def menu_leds(app_index: int, total_apps: int, num_leds: int = NUM_LEDS) -> List
     leds: List[Tuple[int, int, int]] = [(0, 0, 0)] * num_leds
     page = app_index // num_leds
     cursor = app_index % num_leds
-    bg = MENU_BACKGROUND_COLORS[page]
+    # Clamp the palette lookup to the 6 defined pages (48 apps); see led_menu.c.
+    pc = min(page, len(MENU_BACKGROUND_COLORS) - 1)
+    bg = MENU_BACKGROUND_COLORS[pc]
     if page < total_apps // num_leds:
         leds = [bg] * num_leds
     else:
         for i in range(total_apps % num_leds):
             leds[i] = bg
-    leds[cursor] = MENU_SELECTED_COLORS[page]
+    leds[cursor] = MENU_SELECTED_COLORS[pc]
     return leds
 
 
 def submenu_leds(item_index: int, num_leds: int = NUM_LEDS) -> List[Tuple[int, int, int]]:
     """Port of LedBar.submenu_display: one lit LED, coloured per page."""
     leds: List[Tuple[int, int, int]] = [(0, 0, 0)] * num_leds
-    leds[item_index % num_leds] = MENU_BACKGROUND_COLORS[item_index // num_leds]
+    pc = min(item_index // num_leds, len(MENU_BACKGROUND_COLORS) - 1)
+    leds[item_index % num_leds] = MENU_BACKGROUND_COLORS[pc]
     return leds
 
 

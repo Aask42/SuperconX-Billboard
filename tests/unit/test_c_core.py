@@ -65,7 +65,7 @@ def test_classify_matches_spec_across_hi_bit_space(lib):
 
 def test_menu_leds_match_spec(lib):
     buf = (ctypes.c_uint8 * 24)()
-    for total in (1, 5, 8, 9, 16, 20):
+    for total in (1, 5, 8, 9, 16, 20, 48, 49, 64):   # 48+ exercises the OOB fix (issue #5)
         for idx in range(total):
             lib.badge_menu_leds(idx, total, buf)
             got = [(buf[i * 3], buf[i * 3 + 1], buf[i * 3 + 2]) for i in range(8)]
@@ -103,7 +103,7 @@ def test_config_helpers_match_spec(lib):
 
 def test_submenu_leds_match_spec(lib):
     buf = (ctypes.c_uint8 * 24)()
-    for item in range(0, 40):
+    for item in range(0, 64):   # past page 6 to cover the clamp (issue #5)
         lib.badge_submenu_leds(item, buf)
         got = [(buf[i * 3], buf[i * 3 + 1], buf[i * 3 + 2]) for i in range(8)]
         assert got == spec.submenu_leds(item), item

@@ -13,7 +13,10 @@ void badge_menu_leds(int app_index, int total_apps, uint8_t out[8][3])
     }
     int page = app_index / 8;
     int cursor = app_index % 8;
-    const uint8_t *bg = MENU_BG[page];
+    /* The palette has 6 pages (48 apps). Clamp the colour lookup so a larger app
+     * count can't read past MENU_BG (the stock led_bar.py left this undefined). */
+    int pc = page < 6 ? page : 5;
+    const uint8_t *bg = MENU_BG[pc];
 
     if (page < total_apps / 8) {
         for (int i = 0; i < 8; i++) {
@@ -34,7 +37,8 @@ void badge_submenu_leds(int item_index, uint8_t out[8][3])
     for (int i = 0; i < 8; i++) {
         out[i][0] = out[i][1] = out[i][2] = 0;
     }
-    const uint8_t *c = MENU_BG[item_index / 8];   /* SUBMENU_SELECTED_COLORS == MENU_BG */
+    int pc = (item_index / 8) < 6 ? (item_index / 8) : 5;   /* clamp: see badge_menu_leds */
+    const uint8_t *c = MENU_BG[pc];   /* SUBMENU_SELECTED_COLORS == MENU_BG */
     int led = item_index % 8;
     out[led][0] = c[0]; out[led][1] = c[1]; out[led][2] = c[2];
 }
