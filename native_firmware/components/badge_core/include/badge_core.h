@@ -37,6 +37,17 @@ void badge_plane_put(uint8_t *black, uint8_t *red, int x, int y, int stride, int
 /* Classify a packed RGB565 value and write it straight into the planes. */
 void badge_rgb565_put(uint8_t *black, uint8_t *red, int x, int y, int stride, uint16_t rgb565);
 
+/* ---- image blit (Gallery app, issue #6) ---- */
+/* Classify a tightly-packed RGBA8888 image (w*h*4 bytes, row-major, no stride
+ * padding) into the colour planes with its top-left at (dst_x,dst_y), matching
+ * badge_classify_pixel (RGB888 -> RGB565 hi-bits). Alpha is ignored — gallery
+ * art is opaque. Pixels that fall outside the 960x672 panel are clipped. */
+void badge_blit_rgba(uint8_t *black, uint8_t *red, int dst_x, int dst_y,
+                     const uint8_t *rgba, int w, int h);
+
+/* Top-left offset that centers a w x h image on the panel (>=0, clamped). */
+void badge_center_offset(int w, int h, int *out_x, int *out_y);
+
 /* ---- text rendering (vendored 8x8 public-domain font, basic latin) ---- */
 /* Draw one ASCII glyph with its top-left at pixel (x,y), in colour class `cls`
  * (BADGE_PX_BLACK/RED/WHITE). `scale` (>=1) enlarges each glyph dot to

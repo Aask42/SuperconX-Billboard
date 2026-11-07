@@ -6,7 +6,7 @@ idf_component_register(
         "tinystories_adapter.cpp"
     INCLUDE_DIRS "include"
     REQUIRES
-        badge_core epd
+        badge_core epd png
         driver esp_driver_spi esp_driver_uart esp_timer esp_psram
         nvs_flash spi_flash vfs
         littlefs led_strip

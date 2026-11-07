@@ -8,7 +8,8 @@
  *   - badge_leds logs EMU_LED lines
  *   - EMU_READY is printed once the console is reading input
  *   - a UART line "@btn <name>" injects a button; "@app <name>" launches an app;
- *     "@name <text>" sets the nametag string (re-renders if nametag is active)
+ *     "@name <text>" sets the nametag string; "@gallery <n>" selects a gallery
+ *     image (both re-render if their app is active)
  *
  * App *content* (real PNG/text/schedule/LLM rendering) is deliberately minimal
  * here — each app draws an identifiable placeholder; issues #6/#7/#8 fill it in.
@@ -28,7 +29,9 @@
 extern "C" {
 #include "epd.h"
 #include "badge_core.h"
+#include "badge_png.h"
 }
+#include <cstdlib>
 #include "badge_leds.hpp"
 
 #if CONFIG_BADGE_EMULATOR
@@ -120,15 +123,51 @@ void render_nametag()
     ESP_LOGI(TAG, "nametag rendered: \"%s\"", g_nametag);
 }
 
-/* Placeholder render for apps not yet built out (gallery/#6-PNG, workshops, LLM):
+/* Gallery (issue #6): decode /data/gallery/NNN.png straight into the planes. */
+constexpr int kGalleryCount = 44;   /* 001.png .. 044.png (badge_spec GALLERY_COUNT) */
+int g_gallery_idx = 1;              /* 1-based currently-shown image */
+
+void render_gallery()
+{
+    char path[48];
+    snprintf(path, sizeof(path), "/data/gallery/%03d.png", g_gallery_idx);
+
+    FILE *f = fopen(path, "rb");
+    if (!f) { ESP_LOGW(TAG, "gallery: %s not found", path); goto placeholder; }
+    {
+        fseek(f, 0, SEEK_END);
+        long len = ftell(f);
+        fseek(f, 0, SEEK_SET);
+        if (len <= 0) { fclose(f); goto placeholder; }
+        uint8_t *buf = (uint8_t *)malloc((size_t)len);
+        if (!buf) { fclose(f); ESP_LOGE(TAG, "gallery: OOM reading %s", path); goto placeholder; }
+        size_t got = fread(buf, 1, (size_t)len, f);
+        fclose(f);
+
+        epd_clear();
+        int w = 0, h = 0;
+        unsigned err = badge_png_decode_to_planes(buf, got,
+                                                  epd_black_plane(), epd_red_plane(), &w, &h);
+        free(buf);
+        if (err) { ESP_LOGE(TAG, "gallery: decode %s failed (%u)", path, err); goto placeholder; }
+        epd_refresh();
+        ESP_LOGI(TAG, "gallery rendered: %s (%dx%d)", path, w, h);
+        return;
+    }
+placeholder:
+    epd_clear();
+    draw_border();
+    fill_rect_black(430, 286, 100, 100);
+    epd_refresh();
+}
+
+/* Placeholder render for apps not yet built out (workshops, terminal, LLM):
  * a border plus a per-app block so the screen is non-blank and distinguishable. */
 void render_app(int idx)
 {
     maybe_load_schedule(idx);
-    if (strcmp(kApps[idx].name, "nametag") == 0) {
-        render_nametag();
-        return;
-    }
+    if (strcmp(kApps[idx].name, "nametag") == 0) { render_nametag(); return; }
+    if (strcmp(kApps[idx].name, "gallery") == 0) { render_gallery(); return; }
     epd_clear();
     draw_border();
     fill_rect_black(40 + idx * 120, 60, 100, 100);
@@ -190,6 +229,16 @@ void on_line(const char *line)
             ESP_LOGI(TAG, "nametag set: \"%s\"", g_nametag);
             if (!g_sw.selecting && app_index_by_name("nametag") == g_sw.active)
                 render_app(g_sw.active);
+        } else if (strncmp(line, "@gallery ", 9) == 0) {
+            int n = atoi(line + 9);
+            if (n >= 1 && n <= kGalleryCount) {
+                g_gallery_idx = n;
+                ESP_LOGI(TAG, "gallery index set: %d", n);
+                if (!g_sw.selecting && app_index_by_name("gallery") == g_sw.active)
+                    render_app(g_sw.active);
+            } else {
+                ESP_LOGW(TAG, "gallery index %d out of 1..%d", n, kGalleryCount);
+            }
         }
     } else if (!g_sw.selecting && strcmp(kApps[g_sw.active].name, "terminal") == 0) {
         /* Terminal app echoes console lines to the screen (and serial). */
