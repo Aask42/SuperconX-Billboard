@@ -11,9 +11,15 @@ void badge_menu_leds(int app_index, int total_apps, uint8_t out[8][3])
     for (int i = 0; i < 8; i++) {
         out[i][0] = out[i][1] = out[i][2] = 0;
     }
+    if (app_index < 0 || total_apps <= 0) {
+        return;
+    }
     int page = app_index / 8;
     int cursor = app_index % 8;
-    const uint8_t *bg = MENU_BG[page];
+    /* The palette has 6 pages; wrap, exactly like the C++ twin
+       (badge_leds.cpp show_menu indexes kMenuBackgrounds[page % size]).
+       Without this, app_index >= 48 read past MENU_BG (ASan-verified). */
+    const uint8_t *bg = MENU_BG[page % (int)(sizeof(MENU_BG) / sizeof(MENU_BG[0]))];
 
     if (page < total_apps / 8) {
         for (int i = 0; i < 8; i++) {

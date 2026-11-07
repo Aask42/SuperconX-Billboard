@@ -46,3 +46,12 @@ def test_bitmask_colour_channels():
     leds = bitmask_to_leds(0xFF, r=2, g=0, b=1)
     assert all(v == (2, 0, 1) for v in leds)
     assert len(leds) == NUM_LEDS
+
+
+def test_palette_wraps_every_six_pages():
+    # 49 apps: app 48 is page 6, which reuses page 0's colours (firmware wraps).
+    leds = menu_leds(app_index=48, total_apps=49)
+    assert leds[0] == MENU_SELECTED_COLORS[0]
+    assert leds[1] == (0, 0, 0)  # partial page: only the one app is lit
+    leds = menu_leds(app_index=49, total_apps=56)
+    assert leds[0] == MENU_BACKGROUND_COLORS[0]

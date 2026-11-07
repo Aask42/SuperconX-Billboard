@@ -9,6 +9,7 @@
 #ifndef BADGE_CORE_H
 #define BADGE_CORE_H
 
+#include <stddef.h>
 #include <stdint.h>
 
 #ifdef __cplusplus
