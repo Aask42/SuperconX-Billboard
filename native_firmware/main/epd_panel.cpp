@@ -258,8 +258,11 @@ esp_err_t update_panel()
     ESP_RETURN_ON_ERROR(wait_ready(pdMS_TO_TICKS(30000)), kTag, "Panel shutdown timeout");
     gpio_set_level(kDataCommand, 0);
     gpio_set_level(kChipSelectLeft, 0);
+    gpio_set_level(kChipSelectRight, 0);
     gpio_set_level(kReset, 0);
     gpio_set_level(kChipSelectLeft, 1);
+    gpio_set_level(kChipSelectRight, 1);
+    gpio_set_level(GPIO_NUM_48, 0);
     ESP_LOGI(kTag, "Full panel refresh completed");
     return ESP_OK;
 }

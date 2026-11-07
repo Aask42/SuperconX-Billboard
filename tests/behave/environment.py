@@ -66,7 +66,10 @@ def before_scenario(context, scenario):
     context.gdb_port = emu.free_port() if "fbdump" in scenario.effective_tags else None
     safe = "".join(c if c.isalnum() else "_" for c in scenario.name)[:48]
     log = context.build_dir / f"behave_{safe}.log"
-    context.qemu = emu.Qemu(context.build_dir, gdb_port=context.gdb_port, echo=False, log=log)
+    # snapshot=True: QEMU discards this scenario's flash writes on exit,
+    # so NVS/LittleFS state can never leak into the next scenario.
+    context.qemu = emu.Qemu(context.build_dir, gdb_port=context.gdb_port, echo=False, log=log,
+                            snapshot=True)
 
 
 def after_scenario(context, scenario):
