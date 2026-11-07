@@ -9,14 +9,16 @@ Feature: The badge firmware boots in the emulator
     And I should see "Calling app_main\(\)" within 30 seconds
     And I should see "SuperconX Billboard" within 20 seconds
     And I should see "LittleFS mounted" within 20 seconds
+    And I should see "psram_free=" within 20 seconds
+    And I should see "EMU_READY" within 20 seconds
     And I should not see "Guru Meditation"
     And I should not see "abort\(\) was called"
+    And I should not see "NO_MEM"
 
   Scenario: The firmware finishes init and runs without panicking
     # Kept short and deterministic: a long wait for the 60s heartbeat makes QEMU
     # flaky on CI hosts. emu.Qemu also fails automatically on a reboot loop.
-    Given the badge firmware is running in the emulator
-    Then I should see "subsystems initialized" within 25 seconds
+    Given the badge firmware has booted
     When I wait 3 seconds
     Then I should not see "Guru Meditation"
     And I should not see "abort\(\) was called"

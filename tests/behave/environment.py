@@ -13,6 +13,7 @@ Run from this directory inside the IDF env:
 """
 import os
 import sys
+import time
 from argparse import Namespace
 from pathlib import Path
 
@@ -66,10 +67,15 @@ def before_scenario(context, scenario):
     context.gdb_port = emu.free_port() if "fbdump" in scenario.effective_tags else None
     safe = "".join(c if c.isalnum() else "_" for c in scenario.name)[:48]
     log = context.build_dir / f"behave_{safe}.log"
-    context.qemu = emu.Qemu(context.build_dir, gdb_port=context.gdb_port, echo=False, log=log)
+    context.qemu = emu.Qemu(
+        context.build_dir, gdb_port=context.gdb_port, echo=False, log=log, snapshot=True
+    )
 
 
 def after_scenario(context, scenario):
     if getattr(context, "qemu", None) is not None:
         context.qemu.close()
         context.qemu = None
+        # Let QEMU fully exit and free its resources before the next boot; the
+        # Espressif 9.2.2 build occasionally SIGSEGVs when instances overlap.
+        time.sleep(1.5)

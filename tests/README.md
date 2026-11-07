@@ -34,8 +34,11 @@ EMU_SKIP_BUILD=1 behave   # reuse the previous emulator build
 ```
 
 `environment.py` builds + images the firmware once via `emu.py`, then gives each
-`@emu` scenario a fresh `emu.Qemu`. If IDF/QEMU aren't present, `@emu` scenarios
-skip (so the suite is safe to invoke anywhere).
+`@emu` scenario a fresh `emu.Qemu` with snapshot mode enabled. Flash writes are
+discarded when the scenario exits, so they cannot affect later scenarios. Tests
+that need persistence across separate QEMU processes must use their own flash
+image without snapshot mode. If IDF/QEMU aren't present, `@emu` scenarios skip
+(so the suite is safe to invoke anywhere).
 
 ## Emulator contract these tests assume (T55, see `../emulator/README.md`)
 

@@ -84,6 +84,22 @@ def step_led_lit(context, index):
     assert lit, f"LED {index} was never lit (no matching EMU_LED line)"
 
 
+def _plane_bit(buf, x, y):
+    off = y * (960 // 8) + (x >> 3)
+    return 1 if (buf[off] & (0x80 >> (x & 7))) else 0
+
+
+@then('the panel pixel at {x:d},{y:d} is {color}')
+def step_pixel(context, x, y, color):
+    assert context.gdb_port, "scenario needs the @fbdump tag to open a gdb stub"
+    black, red = context.emu.read_planes(
+        context.build_dir, context.gdb_port, "badge_emu_fb_black", "badge_emu_fb_red"
+    )
+    b, r = _plane_bit(black, x, y), _plane_bit(red, x, y)
+    got = "red" if r else ("black" if b else "white")
+    assert got == color, f"pixel ({x},{y}) is {got}, expected {color}"
+
+
 @then('the e-paper screen is saved to "{name}"')
 def step_fbdump(context, name):
     assert context.gdb_port, "scenario needs the @fbdump tag to open a gdb stub"

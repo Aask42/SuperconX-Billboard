@@ -1,4 +1,4 @@
-@emu @wip
+@emu
 Feature: Button-driven app switcher
   Menu-/Menu+ move the selection, User A/B launch the selected app, and each
   launch repaints the e-paper. Mirrors the stock AppSwitcher behaviour.

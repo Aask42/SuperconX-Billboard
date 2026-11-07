@@ -1,4 +1,4 @@
-@emu @wip
+@emu
 Feature: Gallery app
   The Gallery app shows a random image from /data/gallery (001..044) and re-rolls
   on a timer. Tagged wip: needs the app + T55 refresh logging.

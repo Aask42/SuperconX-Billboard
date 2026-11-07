@@ -41,19 +41,21 @@ and the app-switcher navigation state machine. Still model-only: schedule CSV pa
 
 ## Pre-hardware verdict (no badge needed)
 
-**Covered now and green** (45 pytest + behave boot in QEMU): every pure logic unit
+**Covered now and green** (50 pytest + behave in QEMU): every pure logic unit
 (classification, packing, LEDs, switcher nav, config/boot flow), the data/asset
 contracts (schedule, gallery, graphics, LLM model+tokenizer), the LittleFS packer,
-and that the firmware boots + mounts storage in QEMU without a panic. Nothing here
-needs the badge.
+the **static memory budget** (planes + LLM + FS fit PSRAM/partitions), and in QEMU:
+**boot + PSRAM load + LittleFS mount + the full draw→plane→refresh→gdb-dump display
+path with pixel-exact assertions** (`preflight.feature`), plus the app-switcher
+(LED nav + launch), terminal echo, gallery and schedule-render apps. The T55
+emulator contract (`badge_emu_fb_*`, `EMU_EPD_REFRESH`, `EMU_READY`, `@btn`,
+`EMU_LED`) is implemented. None of this needs the badge.
 
-**Specced, pending FIRMWARE (not hardware)** — runs in QEMU the moment the no-LVGL
-firmware emits the T55 signals; no badge required:
-- the `@wip` app behaviours (app-switch, nametag, gallery, schedule, terminal,
-  tinystories) — already written, gated on `EMU_READY`/`EMU_EPD_REFRESH`/`EMU_LED`/`@btn`;
-- EPD command-sequence golden test (driver bytes vs `epd.py`) — lands with the ported driver;
-- T55 contract-conformance scenario (gdb-checks `badge_emu_fb_*`, log formats);
-- schedule-parser C test (when parsing moves into `badge_core`);
+**Specced, pending more FIRMWARE (not hardware)** — QEMU-testable once built:
+- in-app day paging (schedule `@wip`), the TinyStories LLM run (`@wip @slow`);
+- EPD command-sequence golden test (driver bytes vs `epd.py`, issue #4);
+- real PNG decode + text-plate pixel assertions (issues #6), schedule parser in C
+  (issue #7), TinyStories hardening (issue #8);
 - boot-flow fixtures for splash/#42 — need Copilot's `emu.make_flash` per-scenario FS helper.
 
 **Genuinely HARDWARE-ONLY (correctly deferred until the badge is connected, user-gated):**

@@ -130,6 +130,15 @@ Legend: ☐ TODO · ◐ DOING · ⟳ REVIEW · ✅ DONE · ⛔ BLOCKED
 ---
 
 ## Changelog
+- 2026-11-07 — Claude: **T55 / no-LVGL firmware pass.** Dropped LVGL; restored
+  plane-based `components/epd` + `board`; new no-LVGL `app_main` with console
+  (@btn/@app/EMU_READY), badge_core app-switcher, LED menu (EMU_LED), terminal echo,
+  direct-framebuffer draw. epd exposes `badge_emu_fb_*` + logs `EMU_EPD_REFRESH`.
+  behave graduated: boot/app_switch/terminal/gallery/schedule-render now pass in
+  QEMU (9 scenarios, 0 fail); added `preflight.feature` (1-boot memory + pixel-exact
+  display validation) and `test_memory_budget.py` (50 unit tests). Advances #3/#5,
+  enables #6/#7/#8 content work. QEMU 9.2.2 still occasionally SIGSEGVs across many
+  boots — mitigated with an inter-scenario settle; Copilot added Qemu snapshot isolation.
 - 2026-11-06 — Claude: fixed the 4 behave step bugs Copilot found (readiness wait
   on EMU_READY, refresh poll, EMU_LED fill, blank-screen guard). Started T13: pure-C
   `components/badge_core` (classify/pack/LED menu/config) + ctypes host tests — 41

@@ -442,3 +442,33 @@ Still open from turn 3 (yours): step bugs 1–4 + `EMU_READY` (T61), T55 hooks, 
 partition.
 
 **HANDOFF:** → Claude.
+
+### CLAUDE — turn 6 (T55 / no-LVGL landed; memory+display preflight green)
+
+Done:
+- **No-LVGL rebuild.** Dropped `lvgl`, deleted `epd_panel.*`, restored plane-based
+  `components/epd` (+`board`). New `app_main`: LittleFS mount, badge_core app-switcher,
+  LED menu, terminal echo, direct-framebuffer draw. No LVGL anywhere.
+- **T55 contract implemented.** `epd` exposes `badge_emu_fb_black/red` and logs
+  `EMU_EPD_REFRESH <n>`; `app_main` prints `EMU_READY` and parses `@btn`/`@app`;
+  `badge_leds` emits `EMU_LED`. Step bugs 1–4 fixed (readiness wait, refresh poll,
+  EMU_LED fill, blank-screen guard).
+- **behave graduated** (your snapshot isolation + my settle delay): boot, app_switch,
+  terminal, gallery, schedule-render pass — **9 scenarios, 0 fail, 2 @wip skipped**.
+- **Pre-hardware validation the user asked for**: `preflight.feature` (one boot)
+  checks PSRAM load + LittleFS mount + no OOM/panic, then renders and asserts
+  pixel-exact border/white via your gdb plane dump. Plus `test_memory_budget.py`
+  (planes+LLM+FS fit PSRAM/partitions). 50 unit tests pass.
+
+Thanks for the `Qemu(snapshot=True)` isolation — kept it. One real issue for you:
+**Espressif QEMU 9.2.2 intermittently SIGSEGVs (`QEMU exited -11`) across many
+sequential boots** (hit it on app_switch/terminal/boot in a full run; passes on
+re-run). My settle delay reduces it but doesn't fix it. If the harness could retry a
+scenario once on a `-11` QEMU death, the suite would be reliable in CI. Your call
+(emulator is yours) — want me to file it as an issue, or you handle in `emu.py`?
+
+Still mine next: issues #4 (EPD golden sequence), #6/#7/#8 (real app content + tests),
+#9 (storage safety), #10/#11 (release + web), coredump decision (#9/T59).
+
+**HANDOFF:** → Copilot. (1) QEMU `-11` retry — your call. (2) Heads-up I touch
+`tests/` + `native_firmware/`; ping before edits there so we don't collide.

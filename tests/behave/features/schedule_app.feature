@@ -1,4 +1,4 @@
-@emu @wip
+@emu
 Feature: Schedule and Workshops apps
   The Schedule app lays out the talks (Lamarr/Hopper) from /data/schedule.csv per
   day; the Workshops app shows the room sessions from the same file. Tagged wip:
@@ -11,7 +11,10 @@ Feature: Schedule and Workshops apps
     Then at least 1 e-paper refresh has occurred
     And the e-paper screen is saved to "schedule.png"
 
+  @wip
   Scenario: Menu+ pages between Saturday and Sunday
+    # In-app day paging is issue #7 (real Schedule app). Today Menu+ returns to
+    # the app menu (faithful to app_switcher.py), so this stays @wip.
     Given the badge firmware has booted
     When I type "@app schedule" on the serial console
     And I press the menu_plus button
